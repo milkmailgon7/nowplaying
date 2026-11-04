@@ -8,8 +8,11 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return; // Spotify·가사 요청은 건드리지 않음
+  // 페이지(index.html)는 GitHub가 10분 동안 캐시해도 되게 보내서, 바뀌었는지 서버에 꼭 물어본다.
+  // 나머지 파일은 주소에 ?v=가 붙어 있어서 바뀌면 주소도 바뀜
+  const req = e.request.mode === 'navigate' ? fetch(e.request.url, { cache: 'no-cache' }) : fetch(e.request);
   e.respondWith(
-    fetch(e.request)
+    req
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();

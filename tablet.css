@@ -6,6 +6,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 갤럭시 탭의 웹 화면은 style.css의 글꼴 이름들(맑은 고딕 등)도 sans-serif도 숫자·기호를
+   아랍어 글꼴(SEC Naskh Arabic)로 그려서 시계의 ':'가 쉼표처럼 보였다.
+   system-ui면 숫자는 Roboto, 한글은 One UI Sans로 그린다 (탭에서 확인) */
+body {
+  font-family: system-ui, sans-serif;
+}
+
 /* ---------- 로그인 화면 ---------- */
 #web-login {
   display: none;
