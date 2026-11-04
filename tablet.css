@@ -122,6 +122,22 @@ body {
   display: none;
 }
 
+/* 바탕화면은 잠금화면에서 누를 수 없어서, 안 쓸 때도 재생바는 남기고 버튼만 숨긴다 */
+[data-mode="wallpaper"] body.calm #controls {
+  opacity: 1;
+  visibility: visible;
+}
+
+[data-mode="wallpaper"] #controls .buttons {
+  transition: opacity 0.3s ease;
+}
+
+[data-mode="wallpaper"] body.calm #controls .buttons {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.8s ease, visibility 0s linear 0.8s;
+}
+
 /* 세로 바탕화면: 앨범 아트를 가운데 크게 두고, 곡 정보와 버튼은 아래에. 가사·목록·볼륨은 자리가 없어서 뺀다 */
 @media (orientation: portrait) {
   [data-mode="wallpaper"] #web-rotate,
