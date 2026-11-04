@@ -10,6 +10,10 @@
   const API = 'https://api.spotify.com/v1';
   const ACCOUNTS = 'https://accounts.spotify.com';
   const LRCLIB = 'https://lrclib.net/api';
+  // 주소에 /가 겹쳐도(…/nowplaying//) 등록한 주소와 같아지게 주소창부터 정리한다
+  if (/\/{2,}/.test(location.pathname)) {
+    history.replaceState(null, '', location.pathname.replace(/\/{2,}/g, '/') + location.search + location.hash);
+  }
   // Spotify 개발자 화면의 Redirect URIs에 이 주소(페이지 주소)를 똑같이 넣어 둬야 한다
   const REDIRECT_URI = location.origin + location.pathname.replace(/index\.html$/, '');
   const AUTH_KEY = 'np-auth';   // { refresh_token, scope }
