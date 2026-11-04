@@ -989,10 +989,11 @@
     if (Date.now() >= seekHoldUntil && !dragging) {
       setProgress(p.progress_ms + (isPlaying ? lag : 0), p.duration_ms || t.duration_ms, isPlaying);
     }
-    // 곡이 끝날 즈음 한 번 더 묻는다 (다음 곡으로 넘어간 게 바로 보이게)
+    // 곡이 끝날 즈음 한 번 더 묻는다 (다음 곡으로 넘어간 게 바로 보이게).
+    // 끝났는데 Spotify가 아직 옛 곡을 알려 주면 5초 동안은 0.8초마다 다시 묻는다
     clearTimeout(endTimer);
     const left = (p.duration_ms || t.duration_ms) - p.progress_ms;
-    if (p.is_playing && left > 0) endTimer = setTimeout(refreshPlayer, left + 500);
+    if (p.is_playing && left > -5000) endTimer = setTimeout(refreshPlayer, left > 0 ? left + 300 : 800);
     showTrack(fromSpotify(t));
     setLikeTrack(t.uri);
     setLyricsTrack(t);
@@ -1488,10 +1489,10 @@
   const forceTest = /[?&]test\b/.test(location.search);
   if (forceTest) startTestMode();
   // 도우미를 아직 못 찾았으면 1초마다, 찾은 뒤에는 5초마다 확인 (컴퓨터를 막 켰을 때 빨리 연결되게)
-  // 탭 버전은 곡이 바뀌었다는 Windows 신호가 없어서 3초마다 묻고, 화면이 꺼져 있으면 묻지 않는다
+  // 탭 버전은 곡이 바뀌었다는 Windows 신호가 없어서 재생 중엔 2초(멈췄으면 4초)마다 묻고, 화면이 꺼져 있으면 묻지 않는다
   async function helperLoop() {
     if (!(webMode && document.hidden)) await checkHelper();
-    setTimeout(helperLoop, !helperReady ? 1000 : webMode ? 3000 : 5000);
+    setTimeout(helperLoop, !helperReady ? 1000 : webMode ? (isPlaying ? 2000 : 4000) : 5000);
   }
   helperLoop();
   if (webMode) {

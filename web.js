@@ -520,6 +520,8 @@
   let wakeLock = null;
 
   function setPlaying(on) {
+    // 안드로이드 앱은 노래가 나오는 동안 잠금화면 위에서 화면을 켜 둔다 (android 폴더의 Site.Bridge)
+    if (on !== playing && window.NowPlayingApp) window.NowPlayingApp.setPlaying(on);
     playing = on;
     syncWakeLock();
   }
