@@ -1202,7 +1202,7 @@
   // 마우스가 hideDelay 동안 안 움직이면 버튼·재생바·볼륨·패널을 숨긴다 (앨범 아트·곡 정보·가사·시계는 남김).
   // 끄는 중이거나 검색어를 입력하는 중에는 숨기지 않는다.
 
-  let hideDelay = 4000; // 0이면 숨기지 않음
+  let hideDelay = webMode ? 0 : 4000; // 0이면 숨기지 않음 (탭 버전은 늘 보이게)
   let lastActive = performance.now();
 
   function wake() {

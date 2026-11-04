@@ -616,6 +616,9 @@
   };
 
   async function dispatch(route, q, body) {
+    // 재생을 바꾸는 요청은 기록을 남긴다 (안드로이드 앱에서는 탭의 logcat에 'chromium' 줄로 보임).
+    // 노래가 혼자 멈췄을 때 이 화면이 멈춘 건지 가리려고
+    if (route === '/api/control' || route === '/api/play') console.info('[NowPlaying]', MODE, route, JSON.stringify(body));
     switch (route) {
       case '/api/status':
         if (!auth.refresh_token) auth = load(AUTH_KEY) || {}; // 바탕화면이면 앱 화면에서 방금 로그인했을 수 있음
