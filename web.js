@@ -545,6 +545,44 @@
 
   document.addEventListener('visibilitychange', syncWakeLock); // 화면을 다시 켜면 다시 잡음
 
+  // ---------- 잠금화면 터치 ----------
+  // 잠금화면은 바탕화면에 터치를 넘겨 주지 않는다. 그래서 앱의 접근성 기능(android 폴더의 LockTouchService)이
+  // 버튼이 있는 자리만 투명하게 덮어 터치를 받고 이 페이지에 넘긴다. 그 자리를 화면 픽셀로 알려 준다
+  if (MODE === 'wallpaper' && window.NowPlayingApp && window.NowPlayingApp.setTouchAreas) {
+    const AREAS = ['#controls', '#btn-like', '#volume', '#panel'];
+    const PAD = 6; // 손가락이 조금 빗나가도 되게 (CSS px)
+    let sent = '';
+    const report = () => {
+      const k = window.devicePixelRatio || 1;
+      const rects = [];
+      for (const sel of AREAS) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) continue;
+        rects.push([r.left - PAD, r.top - PAD, r.right + PAD, r.bottom + PAD].map((v) => Math.round(v * k)));
+      }
+      const json = JSON.stringify(rects);
+      if (json === sent) return;
+      sent = json;
+      window.NowPlayingApp.setTouchAreas(json);
+    };
+    const watch = new ResizeObserver(report);
+    const start = () => {
+      for (const sel of AREAS) {
+        const el = document.querySelector(sel);
+        if (el) watch.observe(el);
+      }
+      report();
+    };
+    if (document.readyState === 'complete') start();
+    else window.addEventListener('load', start);
+    window.addEventListener('resize', report);
+    setInterval(report, 2000); // 자리만 옮겨지거나 숨겨진 것도 잡게 (바탕화면이 안 보이면 멈춤)
+  }
+
   // ---------- 로그인 화면 ----------
 
   const gate = document.createElement('div');

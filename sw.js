@@ -17,8 +17,10 @@ self.addEventListener('fetch', (e) => {
         if (res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(e.request, copy));
+          return res;
         }
-        return res;
+        // GitHub가 잠깐 오류 페이지를 주면 마지막으로 받아 둔 것을 쓴다 (바탕화면에 오류 화면이 뜨지 않게)
+        return caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || res);
       })
       .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );

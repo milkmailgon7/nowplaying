@@ -127,6 +127,46 @@ body {
   display: none;
 }
 
+/* 잠금화면의 맨 아래 줄은 전화·카메라 바로가기(양쪽 끝 동그라미, 아래에서 약 116px)와
+   가운데 '화면을 밀어 잠금을 해제하세요' 글자가 차지한다. 그래서 바탕화면에서는
+   곡 정보·버튼·볼륨을 그 위로 올리고(--lift), 앨범 아트·가사·목록은 조금 작게/위로 옮긴다.
+   시계는 위쪽 자물쇠 아이콘과 안 겹치게 지금 자리 그대로 둔다 (아트 위 끝도 그대로 21vh) */
+@media (orientation: landscape) {
+  [data-mode="wallpaper"] {
+    --art-size: 55vh;
+    --mid: 48.5vh; /* 아트·가사·목록의 세로 가운데 (원래 50%) */
+    --lift: 9vh;
+  }
+
+  [data-mode="wallpaper"] #art,
+  [data-mode="wallpaper"] #logo,
+  [data-mode="wallpaper"] #lyrics {
+    top: var(--mid);
+  }
+
+  [data-mode="wallpaper"] #panel {
+    top: var(--mid);
+    height: 64vh; /* 올라온 볼륨과 안 겹치게 (원래 72vh) */
+  }
+
+  [data-mode="wallpaper"] #clock {
+    --clock-size: min(7.5vh, (var(--mid) - min(var(--art-size), 80vw) / 2 - 5vh) / 1.45);
+    bottom: calc(100vh - var(--mid) + min(var(--art-size), 80vw) / 2 + 3vh);
+  }
+
+  [data-mode="wallpaper"] #info {
+    bottom: calc(3.6vh + var(--lift));
+  }
+
+  [data-mode="wallpaper"] #controls {
+    bottom: calc(2.4vh + var(--lift));
+  }
+
+  [data-mode="wallpaper"] #volume {
+    bottom: calc(4.4vh + var(--lift));
+  }
+}
+
 /* 세로 바탕화면: 앨범 아트를 가운데 크게 두고, 곡 정보와 버튼은 아래에. 가사·목록·볼륨은 자리가 없어서 뺀다 */
 @media (orientation: portrait) {
   [data-mode="wallpaper"] #web-rotate,
@@ -135,12 +175,26 @@ body {
     display: none;
   }
 
+  /* 여기서도 맨 아래 바로가기 줄 위로 올리고, 그만큼 아트와 시계를 위로 */
+  [data-mode="wallpaper"] #art,
+  [data-mode="wallpaper"] #logo {
+    top: 46%;
+  }
+
+  [data-mode="wallpaper"] #clock {
+    bottom: calc(54% + min(var(--art-size), 80vw) / 2 + 3vh);
+  }
+
   [data-mode="wallpaper"] #info {
     left: 50%;
-    bottom: 15vh;
+    bottom: 18.5vh;
     max-width: 86vw;
     transform: translateX(-50%);
     text-align: center;
+  }
+
+  [data-mode="wallpaper"] #controls {
+    bottom: 8vh;
   }
 
   [data-mode="wallpaper"] #progress {
