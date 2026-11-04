@@ -18,6 +18,12 @@
   const REDIRECT_URI = location.origin + location.pathname.replace(/index\.html$/, '');
   const AUTH_KEY = 'np-auth';   // { refresh_token, scope }
   const PKCE_KEY = 'np-pkce';   // 로그인 중: { verifier, state }
+  // 안드로이드 앱(android 폴더)에서 열리면 주소 끝에 ?app(앱 화면) 또는 ?wallpaper(바탕화면)가 붙는다.
+  // 두 화면은 같은 localStorage를 쓰므로 앱 화면에서 로그인하면 바탕화면도 로그인된다.
+  const params = new URLSearchParams(location.search);
+  const MODE = params.has('wallpaper') ? 'wallpaper' : params.has('app') ? 'app' : 'web';
+  document.documentElement.dataset.mode = MODE; // tablet.css가 바탕화면 모양을 고름
+  const APP_PACKAGE = 'app.nowplaying.wallpaper';
 
   class NotLoggedIn extends Error {}
 
@@ -30,6 +36,7 @@
   let expiresAt = 0;
   let refreshing = null; // 토큰을 새로 받는 중이면 그 Promise (여러 요청이 한 번만 받게)
   let loginError = '';
+  let handoff = null;    // 앱에서 시작한 로그인을 브라우저에서 마쳤을 때 앱으로 돌아갈 주소
 
   function load(key) {
     try {
@@ -60,7 +67,8 @@
   async function login() {
     const verifier = randomString(64);
     const challenge = base64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-    const state = randomString(16);
+    // 앱 화면은 Spotify 로그인을 브라우저로 넘기므로, 돌아올 곳이 앱이라는 표시를 state에 붙인다
+    const state = (MODE === 'app' ? 'app-' : '') + randomString(16);
     // sessionStorage가 아니라 localStorage: 홈 화면 앱에서 로그인하면 돌아올 때 다른 창일 수 있음
     store(PKCE_KEY, { verifier, state });
     location.href = `${ACCOUNTS}/authorize?${new URLSearchParams({
@@ -94,6 +102,12 @@
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (res.status === 400 || res.status === 401) {
+        // 앱 화면과 바탕화면이 같은 토큰을 쓰다가 다른 쪽이 먼저 새 토큰으로 바꿨으면, 로그아웃하지 않고 그걸 쓴다
+        const stored = load(AUTH_KEY);
+        if (form.grant_type === 'refresh_token' && stored && stored.refresh_token && stored.refresh_token !== form.refresh_token) {
+          auth = stored;
+          throw new Error('잠시 후 다시 해 주세요');
+        }
         // 리프레시 토큰이 취소/만료됨 → 다시 로그인해야 함
         logout();
         throw new NotLoggedIn();
@@ -121,6 +135,12 @@
       return;
     }
     if (!pending || pending.state !== q.get('state')) {
+      if ((q.get('state') || '').startsWith('app-')) {
+        // 앱 화면에서 시작한 로그인: code를 여기서 쓰지 않고 앱으로 넘긴다 (확인용 값이 앱 쪽에 있음)
+        handoff = `intent://login?${new URLSearchParams({ code: q.get('code'), state: q.get('state') })}`
+          + `#Intent;scheme=nowplaying;package=${APP_PACKAGE};end`;
+        return;
+      }
       loginError = '로그인 요청이 만료됐어요. 다시 눌러 주세요.';
       return;
     }
@@ -139,6 +159,8 @@
 
   function token() {
     if (accessToken && Date.now() < expiresAt - 60000) return Promise.resolve(accessToken);
+    const stored = load(AUTH_KEY); // 다른 화면(앱/바탕화면)이 로그인했거나 토큰을 바꿨을 수 있음
+    if (stored && stored.refresh_token) auth = stored;
     if (!auth.refresh_token) return Promise.reject(new NotLoggedIn());
     if (!refreshing) {
       refreshing = tokenRequest({
@@ -503,7 +525,7 @@
   }
 
   async function syncWakeLock() {
-    if (!('wakeLock' in navigator)) return;
+    if (!('wakeLock' in navigator) || MODE === 'wallpaper') return; // 바탕화면이 화면을 켜 두면 안 됨
     if (playing && !wakeLock && !document.hidden) {
       try {
         wakeLock = await navigator.wakeLock.request('screen');
@@ -533,6 +555,10 @@
       <div class="error"></div>
     </div>`;
   gate.querySelector('button').addEventListener('click', () => {
+    if (handoff) {
+      location.href = handoff;
+      return;
+    }
     if (!CLIENT_ID) {
       gate.querySelector('.error').textContent = 'config.js에 Spotify Client ID가 없어요. 컴퓨터에서 tablet/build.py를 다시 실행해 주세요.';
       return;
@@ -540,10 +566,24 @@
     login();
   });
 
+  // 바탕화면에서는 글자를 칠 수 없어서 앱 화면에서 로그인하라고만 알려 준다 (버튼은 tablet.css가 숨김)
+  if (MODE === 'wallpaper') {
+    gate.querySelector('.desc').textContent = '탭에서 Now Playing 앱을 열어 Spotify에 로그인해 주세요. 로그인하면 바탕화면에도 바로 나와요.';
+  }
+
   function showGate(on) {
     if (on && !gate.isConnected) document.body.append(gate);
     gate.classList.toggle('on', on);
     gate.querySelector('.error').textContent = loginError;
+  }
+
+  // 앱 화면에서 시작한 로그인을 브라우저에서 마쳤으면 앱으로 돌아가는 버튼을 보여 준다
+  function showHandoff() {
+    gate.querySelector('.title').textContent = '로그인했어요';
+    gate.querySelector('.desc').textContent = '아래 버튼을 눌러 Now Playing 앱으로 돌아가 주세요.';
+    gate.querySelector('button').textContent = '앱으로 돌아가기';
+    showGate(true);
+    location.href = handoff; // 브라우저가 막으면 버튼으로
   }
 
   // 세로로 들면 화면이 맞지 않아서 돌려 달라고 한다 (tablet.css가 세로일 때만 보이게 함)
@@ -554,7 +594,10 @@
 
   // ---------- script.js가 부르는 곳 ----------
 
-  const ready = finishLogin(); // 첫 요청 전에 로그인 돌아온 것부터 처리
+  // 첫 요청 전에 로그인 돌아온 것부터 처리
+  const ready = finishLogin().then(() => {
+    if (handoff) showHandoff();
+  });
 
   window.webHelper = (path, body) => {
     const [route, query] = path.split('?');
@@ -573,10 +616,13 @@
   async function dispatch(route, q, body) {
     switch (route) {
       case '/api/status':
+        if (!auth.refresh_token) auth = load(AUTH_KEY) || {}; // 바탕화면이면 앱 화면에서 방금 로그인했을 수 있음
         showGate(!auth.refresh_token);
         return auth.refresh_token
           ? { ready: true, step: 'ok' }
-          : { ready: false, msg: 'Spotify 로그인이 필요해요.\n화면 가운데의 로그인 버튼을 눌러 주세요.' };
+          : { ready: false, msg: MODE === 'wallpaper'
+            ? 'Spotify 로그인이 필요해요.\nNow Playing 앱을 열어 로그인해 주세요.'
+            : 'Spotify 로그인이 필요해요.\n화면 가운데의 로그인 버튼을 눌러 주세요.' };
       case '/api/player': return apiPlayer();
       case '/api/queue': return apiQueue();
       case '/api/playlists': return apiPlaylists();

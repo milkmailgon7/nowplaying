@@ -108,6 +108,34 @@ body {
   }
 }
 
+/* ---------- 안드로이드 바탕화면 (web.js가 html에 data-mode="wallpaper"를 붙임) ---------- */
+/* 바탕화면에서는 글자를 칠 수 없어서 검색과 로그인 버튼을 뺀다 (로그인은 앱 화면에서) */
+[data-mode="wallpaper"] .tab[data-tab="search"],
+[data-mode="wallpaper"] #web-login button {
+  display: none;
+}
+
+/* 세로 바탕화면: 앨범 아트를 가운데 크게 두고, 곡 정보와 버튼은 아래에. 가사·목록·볼륨은 자리가 없어서 뺀다 */
+@media (orientation: portrait) {
+  [data-mode="wallpaper"] #web-rotate,
+  [data-mode="wallpaper"] #panel,
+  [data-mode="wallpaper"] #volume {
+    display: none;
+  }
+
+  [data-mode="wallpaper"] #info {
+    left: 50%;
+    bottom: 15vh;
+    max-width: 86vw;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+
+  [data-mode="wallpaper"] #progress {
+    width: 80vw;
+  }
+}
+
 /* ---------- 손가락 조작 ---------- */
 /* 막대는 손가락으로 잡기 쉽게 누르는 영역을 위아래로 넓힌다 (보이는 자리는 그대로) */
 .slider .hit {
