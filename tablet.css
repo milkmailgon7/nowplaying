@@ -1,0 +1,150 @@
+/* 탭(웹) 버전에만 들어가는 것: 로그인 화면, 검색 입력칸, 세로 화면 안내, 손가락 조작 */
+
+html,
+body {
+  touch-action: manipulation; /* 두 번 눌러 확대되지 않게 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- 로그인 화면 ---------- */
+#web-login {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+}
+
+#web-login.on {
+  display: grid;
+}
+
+#web-login .card {
+  width: min(48vh, 86vw);
+  padding: 3.6vh 3.2vh;
+  border-radius: 2vh;
+  background: rgba(30, 34, 34, 0.95);
+  box-shadow: 0 2vh 6vh rgba(0, 0, 0, 0.45);
+  text-align: center;
+  word-break: keep-all; /* 한국어를 낱말 중간에서 줄바꿈하지 않게 */
+}
+
+#web-login .title {
+  font-size: 2.4vh;
+  font-weight: 700;
+}
+
+#web-login .desc {
+  margin-top: 1.2vh;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.5vh;
+  line-height: 1.5;
+}
+
+#web-login button {
+  margin-top: 2.8vh;
+  padding: 1.4vh 3.4vh;
+  border: 0;
+  border-radius: 99px;
+  background: #1ed760;
+  color: #000;
+  font: inherit;
+  font-size: 1.7vh;
+  font-weight: 700;
+}
+
+#web-login button:active {
+  transform: scale(0.97);
+}
+
+#web-login .error {
+  margin-top: 1.6vh;
+  color: #ff8a80;
+  font-size: 1.35vh;
+  line-height: 1.5;
+}
+
+#web-login .error:empty {
+  display: none;
+}
+
+/* ---------- 검색 입력칸 ---------- */
+/* 검색칸의 글자 자리에 겹쳐 띄운다 (검색칸은 입력 중 모양으로 바뀌고 안내 글자는 숨겨짐) */
+#web-search {
+  position: fixed;
+  z-index: 30;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 1.4vh;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#web-search::-webkit-search-cancel-button {
+  display: none;
+}
+
+/* ---------- 세로 화면 안내 ---------- */
+#web-rotate {
+  display: none;
+}
+
+@media (orientation: portrait) {
+  #web-rotate {
+    display: grid;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    place-items: center;
+    background: #1c2222;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 3.4vw;
+  }
+}
+
+/* ---------- 손가락 조작 ---------- */
+/* 막대는 손가락으로 잡기 쉽게 누르는 영역을 위아래로 넓힌다 (보이는 자리는 그대로) */
+.slider .hit {
+  margin: -0.8vh 0;
+  padding: 1.6vh 0;
+}
+
+@media (hover: none) {
+  /* 누른 뒤에 마우스를 올린 모양이 남지 않게 */
+  .ctl:hover {
+    color: rgba(255, 255, 255, 0.75);
+    transform: none;
+  }
+
+  .row.click:hover {
+    background: none;
+  }
+
+  .row.click:active {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .tab:not(.on):hover,
+  .search-box:not(.typing):hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .slider:not(.dragging) .hit:hover .fill {
+    background: #fff;
+  }
+
+  .slider:not(.dragging) .hit:hover .fill::after {
+    opacity: 0;
+  }
+
+  /* 검색 결과의 '대기열에 추가'는 마우스를 올릴 수 없으니 늘 보이게 */
+  .row-action {
+    opacity: 1;
+  }
+}

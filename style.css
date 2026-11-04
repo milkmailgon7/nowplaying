@@ -1,0 +1,822 @@
+:root {
+  --art-size: 58vh;   /* 앨범 아트 크기 (Lively 설정에서 바뀜) */
+  --fade: 0.45s;      /* 곡이 바뀔 때 크로스페이드 시간 (script.js의 FADE_MS와 맞춤) */
+  /* 대기열·볼륨의 오른쪽 여백: 앨범 아트와 대기열 사이를 가사와 앨범 아트 사이(5.6vh)만큼 둔다
+     (아트를 키워도 화면 끝에서 3.9vh보다 바깥으로는 안 나감) */
+  --right-edge: max(3.9vh, 50vw - min(var(--art-size), 80vw) / 2 - 5.6vh - 42vh);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1c2222;
+}
+
+body {
+  font-family: "Pretendard", "Pretendard Variable", "Malgun Gothic", "맑은 고딕",
+    "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  color: #fff;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 배경 ---------- */
+#bg,
+.bg-layer {
+  position: fixed;
+  inset: 0;
+}
+
+.bg-layer {
+  opacity: 0;
+  transition: opacity var(--fade) ease;
+}
+
+.bg-layer.on {
+  opacity: 1;
+}
+
+/* ---------- 앨범 아트 ---------- */
+#art {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: min(var(--art-size), 80vw);
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  border-radius: 1.1vh;
+  overflow: hidden;
+  box-shadow:
+    0 2.4vh 6vh rgba(0, 0, 0, 0.45),
+    0 0.6vh 1.6vh rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transition: opacity var(--fade) ease;
+}
+
+#art.has {
+  opacity: 1;
+}
+
+.art-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 썸네일(약 300px)을 크게 늘리므로 부드러운 보간이 가장 덜 거칠어 보임 */
+  image-rendering: auto;
+  opacity: 0;
+  transition: opacity var(--fade) ease;
+}
+
+.art-layer.on {
+  opacity: 1;
+}
+
+/* ---------- 빈 화면용 Spotify 로고 ---------- */
+#logo {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: calc(min(var(--art-size), 80vw) * 0.36);
+  transform: translate(-50%, -50%);
+  fill: #1ed760;
+  opacity: 0.9;
+  filter: drop-shadow(0 1.6vh 4vh rgba(0, 0, 0, 0.35));
+  transition: opacity var(--fade) ease;
+  pointer-events: none;
+}
+
+/* 앨범 아트가 보이면 로고는 숨김 */
+#art.has + #logo {
+  opacity: 0;
+}
+
+/* ---------- 곡 정보 ---------- */
+#info {
+  position: fixed;
+  left: 3.9vh;
+  bottom: 3.6vh;
+  display: flex;
+  align-items: center;
+  gap: 1.4vh;
+  max-width: calc(50vw - 39vh); /* 가운데 재생바(폭 64vh)와 겹치지 않게 */
+  transition: opacity 0.3s ease;
+}
+
+#info .text {
+  min-width: 0;
+}
+
+/* 제목이 바뀔 때: 빨리 사라지고(0.15초) 천천히 나타남(0.3초) */
+#info.hide {
+  opacity: 0;
+  transition-duration: 0.15s;
+}
+
+#title,
+#sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#title {
+  font-size: 1.85vh;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+#sub {
+  margin-top: 0.3vh;
+  font-size: 1.1vh;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ---------- 좋아요 ---------- */
+/* 좋아요 여부를 알기 전에는 숨겨 둔다 (빈 하트가 보였다가 채워지는 깜빡임 방지) */
+.ctl.like {
+  flex: none;
+  width: 3.2vh;
+  height: 3.2vh;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.ctl.like.known {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ctl.like svg {
+  width: 2.1vh;
+  height: 2.1vh;
+}
+
+.ctl.like .i-on,
+.ctl.like.liked .i-off {
+  display: none;
+}
+
+.ctl.like.liked .i-on {
+  display: block;
+}
+
+.ctl.like.liked,
+.ctl.like.liked:hover {
+  color: #1ed760;
+}
+
+.ctl.like.pop svg {
+  animation: like-pop 0.35s ease;
+}
+
+@keyframes like-pop {
+  50% {
+    transform: scale(1.3);
+  }
+}
+
+/* ---------- 가사 ---------- */
+/* 앨범 아트 왼쪽의 빈 곳. 지금 줄이 위에서 38% 자리에 오도록 .inner를 밀어 올린다 */
+#lyrics {
+  position: fixed;
+  left: 5.4vh;
+  top: 50%;
+  width: calc(50vw - min(var(--art-size), 80vw) / 2 - 11vh);
+  height: 52vh;
+  transform: translateY(-50%);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(transparent, #000 20%, #000 72%, transparent);
+  mask-image: linear-gradient(transparent, #000 20%, #000 72%, transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+#lyrics.on {
+  opacity: 1;
+}
+
+#lyrics .inner {
+  transition: transform 0.6s cubic-bezier(0.25, 0.8, 0.3, 1);
+}
+
+.line {
+  margin-bottom: 1.5vh;
+  font-size: 2.3vh;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.3);
+  overflow-wrap: anywhere;
+  transition: color 0.3s ease;
+}
+
+.line.on {
+  color: #fff;
+}
+
+/* 화면이 좁으면 가사 자리가 없어서 숨김 */
+@media (max-aspect-ratio: 5/4) {
+  #lyrics {
+    display: none;
+  }
+}
+
+/* ---------- 시계 ---------- */
+/* 앨범 아트 바로 위 가운데. 아트를 키우면 위쪽 빈 곳에 맞춰 시계가 작아진다
+   (시계 전체 높이 ≈ 글자 크기 × 1.45, 화면 위 여백 2vh + 아트와 간격 3vh) */
+#clock {
+  --clock-size: min(7.5vh, (50vh - min(var(--art-size), 80vw) / 2 - 5vh) / 1.45);
+  position: fixed;
+  left: 50%;
+  bottom: calc(50% + min(var(--art-size), 80vw) / 2 + 3vh);
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0.3vh 2vh rgba(0, 0, 0, 0.25);
+}
+
+#clock.off {
+  display: none;
+}
+
+#clock-time {
+  font-size: var(--clock-size);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+#clock-time .ampm {
+  margin-right: calc(var(--clock-size) * 0.1);
+  font-size: calc(var(--clock-size) * 0.32);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+#clock-date {
+  margin-top: calc(var(--clock-size) * 0.08);
+  font-size: calc(var(--clock-size) * 0.24);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ---------- 멈춤 ---------- */
+#dim {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+body.idle #dim {
+  opacity: 0.35;
+}
+
+/* ---------- 재생 버튼 ---------- */
+#controls {
+  position: fixed;
+  left: 50%;
+  bottom: 2.4vh;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4vh;
+  z-index: 10;
+  transition: opacity 0.3s ease;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 3.4vh;
+}
+
+#controls.offline {
+  opacity: 0.35;
+}
+
+.ctl {
+  display: grid;
+  place-items: center;
+  width: 4vh;
+  height: 4vh;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.ctl:hover {
+  color: #fff;
+  transform: scale(1.06);
+}
+
+.ctl svg {
+  width: 2.2vh;
+  height: 2.2vh;
+  fill: currentColor;
+}
+
+.ctl.play {
+  width: 5.4vh;
+  height: 5.4vh;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+}
+
+.ctl.play:hover {
+  color: #000;
+}
+
+.ctl.play svg {
+  width: 2vh;
+  height: 2vh;
+}
+
+.ctl .i-pause,
+.ctl.playing .i-play {
+  display: none;
+}
+
+.ctl.playing .i-pause {
+  display: block;
+}
+
+/* 셔플·반복: 켜지면 초록색 + 아래 작은 점 (Spotify와 같은 표시) */
+.ctl.toggle {
+  position: relative;
+}
+
+.ctl.toggle svg {
+  width: 2vh;
+  height: 2vh;
+}
+
+.ctl .i-repeat-one,
+.ctl.repeat-track .i-repeat {
+  display: none;
+}
+
+.ctl.repeat-track .i-repeat-one {
+  display: block;
+}
+
+.ctl.on,
+.ctl.on:hover,
+.ctl.repeat-context,
+.ctl.repeat-track,
+.ctl.repeat-context:hover,
+.ctl.repeat-track:hover {
+  color: #1ed760;
+}
+
+.ctl.on::after,
+.ctl.repeat-context::after,
+.ctl.repeat-track::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.2vh;
+  width: 0.45vh;
+  height: 0.45vh;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+
+/* ---------- 재생바 ---------- */
+#progress {
+  display: flex;
+  align-items: center;
+  gap: 1.2vh;
+  width: 64vh;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.1vh;
+  font-variant-numeric: tabular-nums;
+}
+
+#progress .time {
+  flex: none;
+  width: 4.2vh;
+}
+
+#time-now {
+  text-align: right;
+}
+
+/* ---------- 막대 (재생바·볼륨 공통) ---------- */
+/* 누르기 쉽게 막대보다 위아래로 넓은 영역 */
+.slider .hit {
+  flex: 1;
+  padding: 0.8vh 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.slider .bar {
+  position: relative;
+  height: 0.45vh;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.slider .fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: inherit;
+  background: #fff;
+  /* 애니메이션 없음: 1초에 한 번 바뀌는 것만 그린다 (배경화면 부담 줄이기) */
+}
+
+/* 마우스를 올리면 나타나는 손잡이 */
+.slider .fill::after {
+  content: "";
+  position: absolute;
+  right: -0.65vh;
+  top: 50%;
+  width: 1.3vh;
+  height: 1.3vh;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.slider .hit:hover .fill,
+.slider.dragging .fill {
+  background: #1ed760;
+}
+
+.slider .hit:hover .fill::after,
+.slider.dragging .fill::after {
+  opacity: 1;
+}
+
+.slider.dragging .fill {
+  transition: none;
+}
+
+/* ---------- 볼륨 ---------- */
+#volume {
+  position: fixed;
+  right: var(--right-edge);
+  bottom: 4.4vh;
+  display: flex;
+  align-items: center;
+  gap: 0.6vh;
+  width: 20vh;
+  z-index: 10;
+  transition: opacity 0.3s ease;
+}
+
+/* 도우미가 꺼졌거나, 볼륨 조절이 안 되는 기기(일부 폰·스피커)일 때 */
+#volume.offline,
+#volume.unsupported {
+  opacity: 0.35;
+}
+
+#volume .ctl {
+  width: 3.2vh;
+  height: 3.2vh;
+}
+
+#volume .ctl svg {
+  width: 2vh;
+  height: 2vh;
+}
+
+#btn-mute .w1,
+#btn-mute .w2,
+#btn-mute .x {
+  display: none;
+}
+
+#btn-mute.vol-low .w1,
+#btn-mute.vol-high .w1,
+#btn-mute.vol-high .w2,
+#btn-mute.vol-muted .x {
+  display: inline;
+}
+
+/* ---------- 재생목록 패널 ---------- */
+#panel {
+  position: fixed;
+  right: var(--right-edge);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42vh; /* 바꾸면 --right-edge의 42vh도 같이 */
+  height: 72vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1.6vh 0.8vh 1.6vh 1.6vh;
+  border-radius: 1.4vh;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(24px);
+  z-index: 10;
+  transition: opacity 0.3s ease;
+}
+
+/* ---------- 안 쓸 때 숨기기 ---------- */
+/* 마우스가 한동안 안 움직이면 버튼·재생바·볼륨·패널이 천천히 사라지고, 움직이면 빨리 돌아온다 */
+/* 다 사라지면 visibility: hidden 으로 아예 안 그린다 (패널 뒤 흐림 효과 계산도 멈춤) */
+body.calm #controls,
+body.calm #volume,
+body.calm #panel,
+body.calm .ctl.like {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.8s ease, visibility 0s linear 0.8s;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.8vh;
+  margin-bottom: 1.2vh;
+}
+
+.tab {
+  padding: 0.7vh 1.5vh;
+  border: 0;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+  font-size: 1.35vh;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.tab.on {
+  background: #fff;
+  color: #000;
+}
+
+/* 안내 문구는 목록을 밀어내지 않게 패널 아래쪽에 떠 있음 */
+#panel-msg {
+  display: none;
+  position: absolute;
+  left: 1.6vh;
+  right: 1.6vh;
+  bottom: 1.6vh;
+  z-index: 2;
+  padding: 1vh 1.2vh;
+  border-radius: 0.8vh;
+  background: rgba(40, 40, 40, 0.95);
+  box-shadow: 0 0.6vh 2vh rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 1.25vh;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+#panel-msg.on {
+  display: block;
+}
+
+.lists {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.list {
+  display: none;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 1.6vh;
+  scrollbar-width: none; /* 기본 스크롤바 대신 아래의 직접 만든 스크롤바를 씀 */
+}
+
+.list::-webkit-scrollbar {
+  display: none;
+}
+
+.list.on {
+  display: block;
+}
+
+/* 직접 만든 스크롤바: 누르기 쉽게 보이는 막대보다 넓은 영역 */
+.scroll-track {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1.4vh;
+  cursor: pointer;
+}
+
+.scroll-track.hidden {
+  display: none;
+}
+
+.scroll-thumb {
+  position: absolute;
+  top: 0;
+  right: 0.3vh;
+  width: 0.6vh;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 0.15s ease, width 0.15s ease;
+}
+
+.scroll-track:hover .scroll-thumb,
+.scroll-track.dragging .scroll-thumb {
+  width: 0.8vh;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.section {
+  margin: 1.4vh 0.8vh 0.6vh;
+  font-size: 1.35vh;
+  font-weight: 700;
+}
+
+.section:first-child {
+  margin-top: 0.4vh;
+}
+
+.empty {
+  margin: 2vh 0.8vh;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.3vh;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 1.2vh;
+  padding: 0.7vh 0.8vh;
+  border-radius: 0.8vh;
+  animation: row-in 0.25s ease;
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.row.click {
+  cursor: pointer;
+}
+
+.row.click:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.row img {
+  -webkit-user-drag: none; /* 끌어서 스크롤할 때 그림이 따라 끌려오지 않게 */
+  flex: none;
+  width: 4.6vh;
+  height: 4.6vh;
+  border-radius: 0.5vh;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.row .text {
+  min-width: 0;
+}
+
+.row .t,
+.row .s {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .t {
+  font-size: 1.45vh;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.row .s {
+  font-size: 1.2vh;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* 지금 재생 중인 곡 / 플레이리스트 */
+.row.now .t {
+  color: #1ed760;
+}
+
+/* 목록 오른쪽의 작은 버튼 (검색 결과: 대기열에 추가) */
+.row .text {
+  flex: 1;
+}
+
+.row-action {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3vh;
+  height: 3vh;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.row:hover .row-action {
+  opacity: 1;
+}
+
+.row-action:hover {
+  color: #fff;
+}
+
+.row-action svg {
+  width: 1.7vh;
+  height: 1.7vh;
+  fill: currentColor;
+}
+
+/* ---------- 검색 ---------- */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 1vh;
+  width: 100%;
+  margin-bottom: 1vh;
+  padding: 1.1vh 1.4vh;
+  border: 0;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font: inherit;
+  font-size: 1.4vh;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.search-box:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.search-box.has-query {
+  color: #fff;
+}
+
+/* 입력 중: 도우미가 띄운 입력칸(FIELD_BG)과 같은 색으로 칠해서 이음매가 안 보이게 */
+.search-box.typing,
+.search-box.typing:hover {
+  background: #2a2a2a;
+  box-shadow: inset 0 0 0 0.2vh #fff;
+  color: #fff;
+}
+
+.search-box.typing #search-text {
+  visibility: hidden;
+}
+
+.search-box svg {
+  flex: none;
+  width: 1.8vh;
+  height: 1.8vh;
+  fill: currentColor;
+}
+
+#search-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

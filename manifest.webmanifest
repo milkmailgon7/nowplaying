@@ -1,0 +1,17 @@
+{
+  "name": "Now Playing",
+  "short_name": "Now Playing",
+  "description": "Spotify에서 듣는 노래를 앨범 아트·가사와 함께 크게 보여 주는 화면",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1c2222",
+  "theme_color": "#1c2222",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
