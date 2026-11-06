@@ -373,6 +373,39 @@ body {
     padding: 3vw 0;
   }
 
+  /* 잠금화면(바탕화면)에서는 아래쪽 약 1/3을 비운다. 거기에 잠금 안내 글자 줄(S25: 높이의 66.5~71%),
+     지문 인식 자리(71~80%), Now Bar, 전화·카메라 바로가기가 있다.
+     그래서 앨범 아트를 줄이고 모두 위로 올려서 버튼이 높이의 64.5%에서 끝나게 한다 */
+  [data-mode="wallpaper"] {
+    --phone-art: min(82vw, 46vh - 39vw);
+  }
+
+  [data-mode="wallpaper"] #clock {
+    --clock-size: 12vw;
+    top: 9vh;
+  }
+
+  [data-mode="wallpaper"] #clock-date {
+    font-size: 3.6vw;
+  }
+
+  [data-mode="wallpaper"] #art,
+  [data-mode="wallpaper"] #logo {
+    top: calc(18.5vh + var(--phone-art) / 2);
+  }
+
+  [data-mode="wallpaper"] #art {
+    width: var(--phone-art);
+  }
+
+  [data-mode="wallpaper"] #info {
+    top: calc(18.5vh + var(--phone-art) + 3vw);
+  }
+
+  [data-mode="wallpaper"] #controls {
+    top: calc(18.5vh + var(--phone-art) + 18vw);
+  }
+
   /* 로그인 화면 */
   [data-mode] #web-login .card {
     width: 86vw;
