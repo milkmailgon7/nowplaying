@@ -679,6 +679,30 @@
     }
   }
 
+  // 새 버전 저절로 받기: 앱 화면·바탕화면은 페이지를 한 번 열면 계속 띄워 두어서, GitHub에 새 파일을 올려도
+  // 다시 열기 전까지 옛 화면 그대로다. 그래서 화면이 보이는 동안 5분에 한 번 index.html을 새로 받아 보고
+  // 파일 버전(?v=)이 바뀌었으면 페이지를 다시 불러온다
+  if (MODE !== 'web') {
+    const versions = (list) => list.filter((u) => u.includes('?v=')).sort().join(' ');
+    let checkedAt = Date.now();
+    const checkUpdate = async () => {
+      if (document.hidden || Date.now() - checkedAt < 5 * 60 * 1000) return;
+      checkedAt = Date.now();
+      try {
+        const res = await fetch(location.pathname, { cache: 'no-cache' });
+        if (!res.ok) return;
+        const html = await res.text();
+        const latest = versions([...html.matchAll(/(?:href|src)="([^"]+)"/g)].map((m) => m[1]));
+        const current = versions([...document.querySelectorAll('[href], [src]')].map((e) => e.getAttribute('href') || e.getAttribute('src')));
+        if (latest && latest !== current) location.reload();
+      } catch (e) {
+        // 인터넷이 잠깐 안 되면 다음에 다시
+      }
+    };
+    document.addEventListener('visibilitychange', checkUpdate);
+    setInterval(checkUpdate, 60 * 1000);
+  }
+
   // 홈 화면에 추가하면 전체 화면 앱처럼 열리게 (sw.js가 있어야 설치할 수 있음)
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
