@@ -590,7 +590,7 @@
   gate.innerHTML = `
     <div class="card">
       <div class="title">Spotify에 로그인해 주세요</div>
-      <div class="desc">이 탭에서 듣는 노래를 보여 주고 조작하려면 처음 한 번 로그인이 필요해요.</div>
+      <div class="desc">듣고 있는 노래를 보여 주고 조작하려면 처음 한 번 로그인이 필요해요.</div>
       <button type="button">Spotify로 로그인</button>
       <div class="error"></div>
     </div>`;
@@ -608,7 +608,7 @@
 
   // 바탕화면에서는 글자를 칠 수 없어서 앱 화면에서 로그인하라고만 알려 준다 (버튼은 tablet.css가 숨김)
   if (MODE === 'wallpaper') {
-    gate.querySelector('.desc').textContent = '탭에서 Now Playing 앱을 열어 Spotify에 로그인해 주세요. 로그인하면 바탕화면에도 바로 나와요.';
+    gate.querySelector('.desc').textContent = 'Now Playing 앱을 열어 Spotify에 로그인해 주세요. 로그인하면 바탕화면에도 바로 나와요.';
   }
 
   function showGate(on) {

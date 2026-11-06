@@ -242,3 +242,161 @@ body {
     opacity: 1;
   }
 }
+
+/* ---------- 휴대폰 세로 (갤럭시 S25 등, 폭 600px 미만) ---------- */
+/* 탭에 맞춘 크기는 모두 화면 높이(vh) 기준이라 길쭉한 휴대폰에서는 너무 작아진다.
+   그래서 휴대폰 세로에서는 크기를 화면 폭(vw) 기준으로 다시 정하고,
+   위에서부터 시계 → 앨범 아트 → 곡 정보 → 버튼 순서로 쌓는다 (모드 상관없이).
+   맨 아래 약 20%는 잠금화면의 지문 인식 자리·Now Bar·전화/카메라 바로가기 자리라 비워 둔다.
+   가사·목록·볼륨은 자리가 없어서 뺀다 */
+@media (orientation: portrait) and (max-width: 599px) {
+  [data-mode] #web-rotate,
+  [data-mode] #panel,
+  [data-mode] #volume,
+  [data-mode] #lyrics {
+    display: none;
+  }
+
+  [data-mode] #clock {
+    --clock-size: 15vw;
+    top: 8.5vh;
+    bottom: auto;
+  }
+
+  /* 아트: 위 끝 21vh, 폭 82vw */
+  [data-mode] #art,
+  [data-mode] #logo {
+    top: calc(21vh + 41vw);
+  }
+
+  [data-mode] #art {
+    width: 82vw;
+    border-radius: 2.4vw;
+  }
+
+  [data-mode] #logo {
+    width: 30vw;
+  }
+
+  /* 곡 정보: 아트 바로 아래 가운데 (높이 약 12.5vw) */
+  [data-mode] #info {
+    left: 50%;
+    top: calc(24.5vh + 82vw);
+    bottom: auto;
+    max-width: 88vw;
+    gap: 3vw;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+
+  [data-mode] #title {
+    font-size: 5.4vw;
+  }
+
+  [data-mode] #sub {
+    margin-top: 0.8vw;
+    font-size: 3.6vw;
+  }
+
+  /* 버튼과 재생바: 곡 정보 아래 */
+  [data-mode] #controls {
+    top: calc(27vh + 94.5vw);
+    bottom: auto;
+    gap: 1.5vw;
+  }
+
+  [data-mode] .buttons {
+    gap: 5vw;
+  }
+
+  [data-mode] .ctl {
+    width: 11vw;
+    height: 11vw;
+  }
+
+  [data-mode] .ctl svg {
+    width: 6.2vw;
+    height: 6.2vw;
+  }
+
+  [data-mode] .ctl.play {
+    width: 15vw;
+    height: 15vw;
+  }
+
+  [data-mode] .ctl.play svg,
+  [data-mode] .ctl.toggle svg {
+    width: 5.6vw;
+    height: 5.6vw;
+  }
+
+  [data-mode] .ctl.on::after,
+  [data-mode] .ctl.repeat-context::after,
+  [data-mode] .ctl.repeat-track::after {
+    bottom: 0.6vw;
+    width: 1.2vw;
+    height: 1.2vw;
+  }
+
+  [data-mode] .ctl.like {
+    width: 9vw;
+    height: 9vw;
+  }
+
+  [data-mode] .ctl.like svg {
+    width: 6vw;
+    height: 6vw;
+  }
+
+  [data-mode] #progress {
+    width: 84vw;
+    gap: 3vw;
+    font-size: 3.2vw;
+  }
+
+  [data-mode] #progress .time {
+    width: 11vw;
+  }
+
+  [data-mode] .slider .bar {
+    height: 1.1vw;
+  }
+
+  [data-mode] .slider .fill::after {
+    right: -1.8vw;
+    width: 3.6vw;
+    height: 3.6vw;
+  }
+
+  [data-mode] .slider .hit {
+    margin: -1.5vw 0;
+    padding: 3vw 0;
+  }
+
+  /* 로그인 화면 */
+  [data-mode] #web-login .card {
+    width: 86vw;
+    padding: 8vw 6vw;
+    border-radius: 4vw;
+  }
+
+  [data-mode] #web-login .title {
+    font-size: 5.4vw;
+  }
+
+  [data-mode] #web-login .desc {
+    margin-top: 2.6vw;
+    font-size: 3.8vw;
+  }
+
+  [data-mode] #web-login button {
+    margin-top: 6vw;
+    padding: 3.2vw 7vw;
+    font-size: 4.2vw;
+  }
+
+  [data-mode] #web-login .error {
+    margin-top: 3.4vw;
+    font-size: 3.4vw;
+  }
+}
