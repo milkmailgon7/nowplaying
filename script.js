@@ -12,60 +12,112 @@
   const titleEl = document.getElementById('title');
   const subEl = document.getElementById('sub');
 
-  const bgState = { idx: 0, gen: 0 };
-  const artState = { idx: 0, gen: 0 };
+  const bgState = { idx: 0, gen: 0, busyUntil: 0 };
+  const artState = { idx: 0, gen: 0, busyUntil: 0 };
 
   // 앨범 아트를 크게 흐려 배경에 깐 것(.ambient-layer)과 아트 뒤 아트 색 빛(.glow-layer). 모양은 style.css.
   // 탭 버전의 앱 화면(로그인·검색용, data-mode="app")에는 넣지 않는다
   const lookLayers = [];
-  const lookState = { idx: 0, gen: 0 };
+  const lookState = { idx: 0, gen: 0, busyUntil: 0 };
   if (document.documentElement.dataset.mode !== 'app') {
-    const make = (cls) => [0, 1].map(() => Object.assign(document.createElement('div'), { className: cls }));
+    const make = (cls) => [0, 1].map(() => {
+      const el = Object.assign(document.createElement('div'), { className: cls });
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 1;
+      cv.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover';
+      el.appendChild(cv);
+      return el;
+    });
     const ambient = make('ambient-layer');
     const glow = make('glow-layer');
+    // 두 장을 상자 하나에 넣고, 상자째로 배경에 섞는다(screen)·흐리게 한다.
+    // 장마다 screen으로 섞으면 어두운 새 그림을 밝은 옛 그림 위에 덮어도 화면이 그대로라서,
+    // 밝은 곡 → 어두운 곡일 때 배경이 페이드 내내 안 변하다가 옛 장을 치우는 순간 한 번에 바뀌었음
+    const box = (cls, kids) => {
+      const el = Object.assign(document.createElement('div'), { className: cls });
+      el.append(...kids);
+      return el;
+    };
     const shade = Object.assign(document.createElement('div'), { id: 'ambient-shade' });
     const grain = Object.assign(document.createElement('div'), { id: 'ambient-grain' });
-    document.getElementById('bg').after(...ambient, shade, grain, ...glow);
+    document.getElementById('bg').after(box('ambient-box', ambient), shade, grain, box('glow-box', glow));
     lookLayers.push(ambient, glow);
   }
 
-  // 흐린 배경과 빛을 새 그림으로. 새 장을 옛 장 위에 올려 천천히 나타나게 하고(LOOK_FADE_MS), 다 나타나면 옛 장을 치운다.
-  // (둘을 동시에 흐려지고 나타나게 하면 중간에 화면이 한 번 어두워짐) null이면 둘 다 천천히 사라짐
-  function setLookArt(src) {
+  // 흐린 그림은 작은 캔버스에 한 번만 흐려 그려 둔다.
+  // (CSS filter: blur로 흐리면 페이드하는 내내 매 프레임 화면 전체를 다시 흐려야 해서 패드에서 프레임이 빠졌고,
+  //  배경 색만 먼저 바뀐 뒤 흐린 그림이 천천히 나타나지 않고 한 번에 툭 바뀌어 보였음)
+  const canvasFilter = 'filter' in document.createElement('canvas').getContext('2d');
+
+  function paintAmbient(layer, img) {
+    const N = 160;
+    const box = Math.max(layer.offsetWidth, layer.offsetHeight) || 2000;
+    const blur = (70 * N) / box; // CSS에서 쓰던 blur(70px)를 캔버스 크기에 맞춘 것
+    const tone = 'saturate(1.5) brightness(0.62)';
+    const cv = layer.firstChild;
+    cv.width = cv.height = N;
+    const ctx = cv.getContext('2d');
+    if (!canvasFilter) {
+      ctx.drawImage(img, 0, 0, N, N);
+      layer.style.filter = `blur(70px) ${tone}`;
+      return;
+    }
+    // 가장자리가 투명하게 빠지지 않게 여유를 두고 흐린 뒤 가운데만 쓴다
+    const m = Math.ceil(blur * 3) + 2;
+    const tmp = document.createElement('canvas');
+    tmp.width = tmp.height = N + 2 * m;
+    const t = tmp.getContext('2d');
+    t.filter = `blur(${blur.toFixed(2)}px) ${tone}`;
+    t.drawImage(img, 0, 0, tmp.width, tmp.height);
+    ctx.drawImage(tmp, m, m, N, N, 0, 0, N, N);
+  }
+
+  // 아트 뒤 빛: 둥근 아트를 가운데 두고 흐려서 주변으로 번진 빛까지 한 장에 담는다.
+  // 크기 비율은 CSS의 --glow-pad(빛 칸이 아트의 몇 배), --glow-blur·--glow-radius(아트 폭 대비)
+  function paintGlow(layer, img) {
+    const cs = getComputedStyle(layer);
+    const pad = parseFloat(cs.getPropertyValue('--glow-pad')) || 2;
+    const blurK = parseFloat(cs.getPropertyValue('--glow-blur')) || 0.09;
+    const radK = parseFloat(cs.getPropertyValue('--glow-radius')) || 0.04;
+    const tone = 'saturate(1.8) brightness(1.1)';
+    const A = 96;
+    const N = Math.round(A * pad);
+    const o = (N - A) / 2;
+    const r = A * radK;
+    const tmp = document.createElement('canvas');
+    tmp.width = tmp.height = N;
+    const t = tmp.getContext('2d');
+    t.beginPath();
+    t.moveTo(o + r, o);
+    t.arcTo(o + A, o, o + A, o + A, r);
+    t.arcTo(o + A, o + A, o, o + A, r);
+    t.arcTo(o, o + A, o, o, r);
+    t.arcTo(o, o, o + A, o, r);
+    t.closePath();
+    t.clip();
+    t.drawImage(img, o, o, A, A);
+    const cv = layer.firstChild;
+    cv.width = cv.height = N;
+    const ctx = cv.getContext('2d');
+    if (canvasFilter) ctx.filter = `blur(${(A * blurK).toFixed(2)}px) ${tone}`;
+    else layer.style.filter = `blur(${((layer.offsetWidth / pad) * blurK).toFixed(1)}px) ${tone}`;
+    ctx.drawImage(tmp, 0, 0);
+  }
+
+  // 흐린 배경과 빛을 새 그림으로 (img: 다 받아 둔 그림). null이면 둘 다 천천히 사라짐
+  function setLookArt(img) {
     if (!lookLayers.length) return;
-    const gen = ++lookState.gen;
-    if (!src) {
+    if (!img) {
+      ++lookState.gen;
+      lookState.busyUntil = performance.now() + LOOK_FADE_MS;
       for (const pair of lookLayers) for (const el of pair) el.classList.remove('on');
       return;
     }
-    const pic = new Image();
-    pic.src = src;
-    (pic.decode ? pic.decode() : Promise.resolve()).catch(() => {}).then(() => {
-      if (lookState.gen !== gen) return;
-      lookState.idx ^= 1;
-      for (const pair of lookLayers) {
-        const next = pair[lookState.idx];
-        const prev = pair[lookState.idx ^ 1];
-        prev.after(next); // 같은 자리의 두 장 중 새 장을 위로 (z-index를 쓰면 앨범 아트·글자보다 위로 올라감)
-        next.style.backgroundImage = `url("${src.replace(/"/g, '%22')}")`;
-        next.style.transition = 'none';
-        next.classList.remove('on');
-        void next.offsetWidth;
-        next.style.transition = '';
-        next.classList.add('on');
-      }
-      setTimeout(() => {
-        if (lookState.gen !== gen) return;
-        for (const pair of lookLayers) {
-          const prev = pair[lookState.idx ^ 1];
-          prev.style.transition = 'none'; // 새 장에 다 가려졌으니 바로 치움
-          prev.classList.remove('on');
-          prev.style.backgroundImage = '';
-          void prev.offsetWidth;
-          prev.style.transition = '';
-        }
-      }, LOOK_FADE_MS + 100);
-    });
+    // 빛은 가장자리가 반투명이라 새 장 아래로 옛 장이 조금 비친다. 그래서 옛 장은 바로 치우지 않고 천천히 지운다
+    crossfade(lookLayers, lookState, ([ambient, glow]) => {
+      paintAmbient(ambient, img);
+      paintGlow(glow, img);
+    }, LOOK_FADE_MS, LOOK_FADE_MS / 2);
   }
 
   let hostSeen = false;  // Lively / Wallpaper Engine에서 신호가 온 적 있는지
@@ -126,33 +178,58 @@
 
   // ---------- 크로스페이드 ----------
 
-  // 안 보이는 쪽 레이어에 새 내용을 넣고, 그 내용이 다 준비되면(그림은 디코딩까지) 위에 올려 페이드인한다.
-  // 준비되기 전에 올리면 그 레이어에 남아 있던 옛 그림(지난 곡 앨범)이 한순간 비친다.
-  // apply가 Promise를 돌려주면 그걸 기다린다. 기다리는 사이 또 바뀌면 마지막 것만 보여 준다
-  function crossfade(layers, state, apply) {
+  // 두 장을 번갈아 쓰는 페이드. layers: 두 장짜리 묶음 하나([a, b]) 또는 같이 바뀌는 묶음 여럿([[a, b], [c, d]])
+  // 1) 앞의 페이드가 끝날 때까지 기다린다 (기다리는 사이 또 바뀌면 마지막 것만).
+  //    페이드 중에 밑장을 바꾸면 반쯤 비치던 아래 그림이 사라지거나 바뀌어 앨범이 깜빡였음
+  //    (곡이 바뀐 직후 고해상도 그림이 도착할 때 이렇게 됐음)
+  // 2) 안 보이는 장에 새 내용을 넣고, 다 준비되면(그림은 디코딩까지) 맨 위로 올려 투명한 데서부터 나타나게 한다.
+  //    준비되기 전에 올리면 그 장에 남아 있던 옛 그림(지난 곡 앨범)이 한순간 비친다
+  // 3) 다 나타나면 밑의 옛 장을 치운다 (tail: 옛 장을 바로 치우지 않고 이만큼(ms) 천천히 지움)
+  function crossfade(layers, state, apply, ms = FADE_MS, tail = 0) {
+    const single = !(layers[0] && layers[0].length === 2);
+    const groups = single ? [layers] : [...layers];
     const gen = ++state.gen;
-    const next = layers[state.idx ^ 1];
-    const prev = layers[state.idx];
-    let ready;
-    try {
-      ready = Promise.resolve(apply(next));
-    } catch (e) {
-      ready = Promise.resolve();
-    }
-    ready.catch(() => {}).then(() => {
+    const start = () => {
       if (state.gen !== gen) return;
-      state.idx ^= 1;
-      next.style.transition = 'none'; // 처음부터(투명한 데서) 다시 페이드
-      next.classList.remove('on');
-      void next.offsetWidth;
-      next.style.transition = '';
-      next.style.zIndex = 2;
-      prev.style.zIndex = 1;
-      next.classList.add('on');
-      setTimeout(() => {
-        if (state.gen === gen) prev.classList.remove('on');
-      }, FADE_MS + 50);
-    });
+      const wait = state.busyUntil - performance.now();
+      if (wait > 0) {
+        setTimeout(start, wait + 10);
+        return;
+      }
+      const nexts = groups.map((g) => g[state.idx ^ 1]);
+      let ready;
+      try {
+        ready = Promise.resolve(apply(single ? nexts[0] : nexts));
+      } catch (e) {
+        ready = Promise.resolve();
+      }
+      ready.catch(() => {}).then(() => {
+        if (state.gen !== gen) return;
+        state.idx ^= 1;
+        state.busyUntil = performance.now() + ms + tail + 60;
+        groups.forEach((g, i) => {
+          const next = nexts[i];
+          const prev = g[state.idx ^ 1];
+          next.style.transition = 'none';
+          next.classList.remove('on');
+          prev.after(next); // 새 장을 위로 (z-index를 쓰면 앨범 아트·글자보다 위로 올라갈 수 있음)
+          void next.offsetWidth;
+          next.style.transition = '';
+          next.classList.add('on');
+        });
+        setTimeout(() => {
+          if (state.gen !== gen) return; // 다음 페이드가 이 장을 다시 쓸 것
+          for (const g of groups) {
+            const prev = g[state.idx ^ 1];
+            prev.style.transition = tail ? `opacity ${tail}ms ease-out` : 'none'; // 새 장에 다 가려졌으면 바로 치움
+            prev.classList.remove('on');
+            void prev.offsetWidth;
+            if (!tail) prev.style.transition = '';
+          }
+        }, ms + 50);
+      });
+    };
+    start();
   }
 
   // 그림 레이어에 새 그림을 넣고 디코딩이 끝날 때까지 기다리는 Promise
@@ -217,17 +294,18 @@
     if (!better()) return;
     loadCors(src).then((img) => {
       if (!better()) return;
-      if (key !== artKey) {
-        crossfade(bgLayers, bgState, (el) => {
-          el.style.background = gradientFor(averageColor(img));
-        });
-      }
       const newSong = key !== artKey;
       artKey = key;
       artQ = q;
       crossfade(artLayers, artState, (el) => setArtSrc(el, src));
-      // 흐린 배경과 빛은 곡이 바뀔 때만 (같은 곡의 더 선명한 그림으로 바뀔 때는 흐려서 차이가 없고, 두 번 출렁이면 어색함)
-      if (newSong) setLookArt(src);
+      // 배경 색·흐린 배경·빛은 곡이 바뀔 때만, 같은 순간에 같이 시작한다
+      // (같은 곡의 더 선명한 그림으로 바뀔 때는 흐려서 차이가 없고, 두 번 출렁이면 어색함)
+      if (newSong) {
+        crossfade(bgLayers, bgState, (el) => {
+          el.style.background = gradientFor(averageColor(img));
+        }, LOOK_FADE_MS);
+        setLookArt(img);
+      }
       artBox.classList.add('has');
     }, () => {});
   }
@@ -785,7 +863,7 @@
     setLyricsTrack(null);
     crossfade(bgLayers, bgState, (el) => {
       el.style.background = 'linear-gradient(180deg, #2b3131 0%, #1c2121 50%, #121515 100%)';
-    });
+    }, LOOK_FADE_MS);
   }
 
   // 도우미가 준 곡 정보를 화면용으로

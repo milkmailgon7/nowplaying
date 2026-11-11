@@ -481,20 +481,26 @@ body {
    web.js가 바탕화면 모드에서만 만든다. 개선안 비교 그림: tablet\design */
 
 /* 1) 배경: 앨범 아트를 크게 흐려 깔고(앰비언트), 위아래를 어둡게 눌러 글자가 잘 읽히게 */
+/* 두 장(.ambient-layer)을 담은 상자째로 배경에 섞는다. 장끼리는 보통으로 겹쳐서 페이드가 고르게 된다 */
+[data-mode="wallpaper"] .ambient-box {
+  position: fixed;
+  inset: 0;
+  mix-blend-mode: screen; /* 어두운 아트면 원래 색 그라데이션이 남고, 밝은 아트면 그 색이 번진다 */
+  opacity: 0.95;
+  pointer-events: none;
+}
+
 [data-mode="wallpaper"] .ambient-layer {
   position: fixed;
   inset: -12%;
-  background-size: cover;
-  background-position: center;
-  filter: blur(70px) saturate(1.5) brightness(0.62);
-  mix-blend-mode: screen; /* 어두운 아트면 원래 색 그라데이션이 남고, 밝은 아트면 그 색이 번진다 */
+  /* 흐림·색 조정은 script.js가 캔버스에 미리 해 둔다 (CSS filter는 페이드 중 매 프레임 다시 계산돼 끊김) */
   transform: scale(1.15);
   opacity: 0;
   transition: opacity var(--look-fade) var(--ease-soft);
 }
 
 [data-mode="wallpaper"] .ambient-layer.on {
-  opacity: 0.95;
+  opacity: 1;
 }
 
 [data-mode="wallpaper"] #ambient-shade {
@@ -657,24 +663,31 @@ body {
   }
 }
 
-/* 앨범 아트 뒤에 아트 색으로 번지는 빛 (아트 자리에 맞춰 같은 크기로 깔고 흐림) */
+/* 앨범 아트 뒤에 아트 색으로 번지는 빛. 칸은 아트의 --glow-pad배, 아트 자리보다 조금 아래가 중심.
+   빛 그림(흐린 둥근 아트)은 script.js가 --glow-blur·--glow-radius(아트 폭 대비)로 캔버스에 그린다 */
 [data-mode="wallpaper"] .glow-layer {
+  --glow-pad: 2;
+  --glow-blur: 0.09;  /* 아트 50vh에 4.5vh */
+  --glow-radius: 0.04;
   position: fixed;
   left: 50%;
   top: 50%;
-  width: min(var(--art-size), 80vw);
+  width: calc(min(var(--art-size), 80vw) * var(--glow-pad));
   aspect-ratio: 1 / 1;
-  transform: translate(-50%, -44%) scale(1.1);
-  background-size: cover;
-  background-position: center;
-  border-radius: 2vh;
-  filter: blur(4.5vh) saturate(1.8) brightness(1.1);
+  transform: translate(-50%, calc(-50% + 6% / var(--glow-pad))) scale(1.1);
   opacity: 0;
   transition: opacity var(--look-fade) var(--ease-soft);
 }
 
 [data-mode="wallpaper"] .glow-layer.on {
+  opacity: 1;
+}
+
+[data-mode="wallpaper"] .glow-box {
+  position: fixed;
+  inset: 0;
   opacity: 0.8;
+  pointer-events: none;
 }
 
 /* 버튼: 재생 버튼만 또렷하게, 나머지는 한 단계 낮춤 */
@@ -781,14 +794,15 @@ body {
     top: calc(19.3vh + var(--phone-art) / 2);
   }
 
-  [data-mode="wallpaper"] #art,
-  [data-mode="wallpaper"] .glow-layer {
+  [data-mode="wallpaper"] #art {
     width: var(--phone-art);
     border-radius: 3.6vw;
   }
 
   [data-mode="wallpaper"] .glow-layer {
-    filter: blur(9vw) saturate(1.8) brightness(1.1);
+    --glow-blur: 0.155;  /* 아트 약 58vw에 9vw */
+    --glow-radius: 0.062;
+    width: calc(var(--phone-art) * var(--glow-pad));
   }
 
   [data-mode="wallpaper"] #info {
