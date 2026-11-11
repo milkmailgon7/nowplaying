@@ -123,6 +123,35 @@
     window.addEventListener('resize', sync); // 화면을 돌리면 목록 칸이 생기거나 없어짐
   }
 
+  // ---------- 바탕화면 배경 ----------
+  // 바탕화면 모드에서만: 앨범 아트를 크게 흐려 배경에 깔고(.ambient-layer), 아트 뒤에 아트 색 빛(.glow-layer)을 둔다.
+  // 모양은 tablet.css. 곡이 바뀌면 script.js가 앨범 아트(.art-layer)를 바꾸는데, 그걸 보고 두 장을 번갈아 겹쳐 부드럽게 바꾼다
+
+  if (MODE === 'wallpaper') {
+    const bg = document.getElementById('bg');
+    const make = (cls) => [0, 1].map(() => Object.assign(document.createElement('div'), { className: cls }));
+    const ambient = make('ambient-layer');
+    const shade = Object.assign(document.createElement('div'), { id: 'ambient-shade' });
+    const grain = Object.assign(document.createElement('div'), { id: 'ambient-grain' });
+    const glow = make('glow-layer');
+    bg.after(...ambient, shade, grain, ...glow);
+    let shownSrc = '';
+    let turn = 0;
+    const sync = () => {
+      // 맨 위에 올라온(지금 보이는) 앨범 아트
+      const top = [...document.querySelectorAll('.art-layer')].filter((i) => i.src && i.style.zIndex === '2')[0];
+      if (!top || top.src === shownSrc) return;
+      shownSrc = top.src;
+      turn ^= 1;
+      for (const pair of [ambient, glow]) {
+        pair[turn].style.backgroundImage = `url("${shownSrc.replace(/"/g, '%22')}")`;
+        pair[turn].classList.add('on');
+        pair[turn ^ 1].classList.remove('on');
+      }
+    };
+    new MutationObserver(sync).observe(document.getElementById('art'), { subtree: true, attributes: true, attributeFilter: ['src', 'style'] });
+  }
+
   // ---------- 인터넷 요청 ----------
   // 응답이 안 오는 요청은 10초에 끊는다 (2초마다 묻는데 안 끊으면 계속 쌓임).
   // 6초 넘게 연달아 실패하면 인터넷이 끊겼다고 알리고, 한 번이라도 되면 지운다.
