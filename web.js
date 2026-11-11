@@ -355,6 +355,33 @@
   let playerAsked = 0;    // /me/player를 물은 차례
   let playerAnswered = 0; // 화면에 반영한 마지막 차례
 
+  // ---------- 이 기기에서 재생 중일 때의 볼륨 ----------
+  // Spotify가 바로 이 휴대폰·탭의 Spotify 앱에서 재생 중이면 Spotify 서버가 볼륨 원격 조절을 막는다
+  // (supports_volume=false, 바꾸려 하면 403). 그때는 안드로이드 앱(Site.Bridge)을 통해 기기 미디어 볼륨을 직접 쓴다.
+  // Spotify 앱은 기기 미디어 볼륨을 그대로 따른다.
+  let localVolume = false; // 지금 재생 기기가 이 기기라서 볼륨을 직접 조절하는지
+
+  function localAudio() {
+    const app = window.NowPlayingApp;
+    if (!app || !app.localAudio || !app.setLocalVolume) return null; // 옛 앱이거나 브라우저
+    try {
+      return JSON.parse(app.localAudio());
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Spotify가 알려 준 재생 기기가 이 기기인지: 이름이 같거나(Spotify 앱은 기기 이름을 씀),
+  // 이름이 달라도 이 기기에서 음악이 나오고 있고 종류(탭/휴대폰)가 같으며 원격 볼륨이 막혀 있으면
+  function isThisDevice(device, local) {
+    if (!local || !device) return false;
+    const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
+    const name = norm(device.name);
+    if (name && (name === norm(local.name) || name === norm(local.model))) return true;
+    return !!local.active && device.supports_volume === false
+      && device.type === (local.tablet ? 'Tablet' : 'Smartphone');
+  }
+
   async function apiPlayer() {
     const turn = ++playerAsked;
     const [code, p] = await api('GET', '/me/player');
@@ -368,6 +395,14 @@
     if (code >= 300) throw new Error(errorMessage(code, p));
     setPlaying(!!p.is_playing);
     const device = p.device || {};
+    const local = localAudio();
+    const wasLocal = localVolume;
+    localVolume = isThisDevice(device, local);
+    if (localVolume !== wasLocal) console.info('[NowPlaying] volume via', localVolume ? 'this device' : 'Spotify', device.type, device.supports_volume);
+    if (localVolume) {
+      device.volume_percent = local.percent;
+      device.supports_volume = true;
+    }
     return {
       active: true,
       is_playing: !!p.is_playing,
@@ -429,6 +464,10 @@
     if (action === 'shuffle') return ok(player('PUT', '/me/player/shuffle', undefined, { state: body.state ? 'true' : 'false' }));
     if (action === 'volume') {
       const volume = Math.min(100, Math.max(0, Math.round(Number(body.volume_percent) || 0)));
+      if (localVolume && localAudio()) {
+        window.NowPlayingApp.setLocalVolume(volume); // 이 기기에서 재생 중: 기기 미디어 볼륨을 직접
+        return {};
+      }
       return ok(player('PUT', '/me/player/volume', undefined, { volume_percent: volume }));
     }
     if (action === 'queue') return ok(player('POST', '/me/player/queue', undefined, { uri: body.uri }));
