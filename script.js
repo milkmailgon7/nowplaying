@@ -1,7 +1,8 @@
 (() => {
   'use strict';
 
-  const FADE_MS = 450;  // style.css의 --fade와 맞춤
+  const FADE_MS = 800;       // 앨범 아트·배경 색 크로스페이드. style.css의 --fade와 맞춤
+  const LOOK_FADE_MS = 1600; // 흐린 배경·아트 뒤 빛. style.css의 --look-fade와 맞춤
   const HI_Q = 1000;    // 그림 품질 값: Windows 썸네일 300, Spotify 640, 고해상도(iTunes) 1000
 
   const bgLayers = document.querySelectorAll('.bg-layer');
@@ -28,22 +29,43 @@
     lookLayers.push(ambient, glow);
   }
 
-  // 흐린 배경과 빛을 새 그림으로 (두 장을 번갈아 겹쳐 부드럽게). null이면 둘 다 사라짐
+  // 흐린 배경과 빛을 새 그림으로. 새 장을 옛 장 위에 올려 천천히 나타나게 하고(LOOK_FADE_MS), 다 나타나면 옛 장을 치운다.
+  // (둘을 동시에 흐려지고 나타나게 하면 중간에 화면이 한 번 어두워짐) null이면 둘 다 천천히 사라짐
   function setLookArt(src) {
     if (!lookLayers.length) return;
     const gen = ++lookState.gen;
-    lookState.idx ^= 1;
-    for (const pair of lookLayers) {
-      const next = pair[lookState.idx];
-      const prev = pair[lookState.idx ^ 1];
-      if (src) next.style.backgroundImage = `url("${src.replace(/"/g, '%22')}")`;
-      next.classList.toggle('on', !!src);
-      prev.classList.remove('on');
+    if (!src) {
+      for (const pair of lookLayers) for (const el of pair) el.classList.remove('on');
+      return;
     }
-    setTimeout(() => {
+    const pic = new Image();
+    pic.src = src;
+    (pic.decode ? pic.decode() : Promise.resolve()).catch(() => {}).then(() => {
       if (lookState.gen !== gen) return;
-      for (const pair of lookLayers) pair[lookState.idx ^ 1].style.backgroundImage = ''; // 안 보이는 쪽 그림은 놓아 줌
-    }, FADE_MS + 50);
+      lookState.idx ^= 1;
+      for (const pair of lookLayers) {
+        const next = pair[lookState.idx];
+        const prev = pair[lookState.idx ^ 1];
+        prev.after(next); // 같은 자리의 두 장 중 새 장을 위로 (z-index를 쓰면 앨범 아트·글자보다 위로 올라감)
+        next.style.backgroundImage = `url("${src.replace(/"/g, '%22')}")`;
+        next.style.transition = 'none';
+        next.classList.remove('on');
+        void next.offsetWidth;
+        next.style.transition = '';
+        next.classList.add('on');
+      }
+      setTimeout(() => {
+        if (lookState.gen !== gen) return;
+        for (const pair of lookLayers) {
+          const prev = pair[lookState.idx ^ 1];
+          prev.style.transition = 'none'; // 새 장에 다 가려졌으니 바로 치움
+          prev.classList.remove('on');
+          prev.style.backgroundImage = '';
+          void prev.offsetWidth;
+          prev.style.transition = '';
+        }
+      }, LOOK_FADE_MS + 100);
+    });
   }
 
   let hostSeen = false;  // Lively / Wallpaper Engine에서 신호가 온 적 있는지
@@ -104,21 +126,39 @@
 
   // ---------- 크로스페이드 ----------
 
-  // 새 레이어를 위에 올려 페이드인하고, 끝나면 아래 레이어를 끈다
+  // 안 보이는 쪽 레이어에 새 내용을 넣고, 그 내용이 다 준비되면(그림은 디코딩까지) 위에 올려 페이드인한다.
+  // 준비되기 전에 올리면 그 레이어에 남아 있던 옛 그림(지난 곡 앨범)이 한순간 비친다.
+  // apply가 Promise를 돌려주면 그걸 기다린다. 기다리는 사이 또 바뀌면 마지막 것만 보여 준다
   function crossfade(layers, state, apply) {
     const gen = ++state.gen;
-    state.idx ^= 1;
-    const next = layers[state.idx];
-    const prev = layers[state.idx ^ 1];
-    apply(next);
-    next.classList.remove('on');
-    void next.offsetWidth; // 페이드를 처음부터 다시 시작
-    next.style.zIndex = 2;
-    prev.style.zIndex = 1;
-    next.classList.add('on');
-    setTimeout(() => {
-      if (state.gen === gen) prev.classList.remove('on');
-    }, FADE_MS + 50);
+    const next = layers[state.idx ^ 1];
+    const prev = layers[state.idx];
+    let ready;
+    try {
+      ready = Promise.resolve(apply(next));
+    } catch (e) {
+      ready = Promise.resolve();
+    }
+    ready.catch(() => {}).then(() => {
+      if (state.gen !== gen) return;
+      state.idx ^= 1;
+      next.style.transition = 'none'; // 처음부터(투명한 데서) 다시 페이드
+      next.classList.remove('on');
+      void next.offsetWidth;
+      next.style.transition = '';
+      next.style.zIndex = 2;
+      prev.style.zIndex = 1;
+      next.classList.add('on');
+      setTimeout(() => {
+        if (state.gen === gen) prev.classList.remove('on');
+      }, FADE_MS + 50);
+    });
+  }
+
+  // 그림 레이어에 새 그림을 넣고 디코딩이 끝날 때까지 기다리는 Promise
+  function setArtSrc(el, src) {
+    el.src = src;
+    return el.decode ? el.decode() : Promise.resolve();
   }
 
   function loadCors(src) {
@@ -163,7 +203,7 @@
       return;
     }
     info.classList.add('hide');
-    textTimer = setTimeout(apply, 150);
+    textTimer = setTimeout(apply, 250); // style.css의 #info.hide 시간
   }
 
   // 그림 후보를 받는다. 지금 곡의 그림이고, 보이는 것보다 품질이 좋을 때만 바꾼다.
@@ -182,12 +222,12 @@
           el.style.background = gradientFor(averageColor(img));
         });
       }
+      const newSong = key !== artKey;
       artKey = key;
       artQ = q;
-      crossfade(artLayers, artState, (el) => {
-        el.src = src;
-      });
-      setLookArt(src);
+      crossfade(artLayers, artState, (el) => setArtSrc(el, src));
+      // 흐린 배경과 빛은 곡이 바뀔 때만 (같은 곡의 더 선명한 그림으로 바뀔 때는 흐려서 차이가 없고, 두 번 출렁이면 어색함)
+      if (newSong) setLookArt(src);
       artBox.classList.add('has');
     }, () => {});
   }
@@ -299,10 +339,7 @@
       if (nowTrack && baseArt && baseArt.key === shownKey) upgradeArt(nowTrack, baseArt.src);
     } else if (artQ >= HI_Q && baseArt && baseArt.key === artKey) {
       artQ = baseArt.q;
-      crossfade(artLayers, artState, (el) => {
-        el.src = baseArt.src;
-      });
-      setLookArt(baseArt.src);
+      crossfade(artLayers, artState, (el) => setArtSrc(el, baseArt.src));
     }
   }
 

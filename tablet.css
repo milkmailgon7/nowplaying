@@ -490,7 +490,7 @@ body {
   mix-blend-mode: screen; /* 어두운 아트면 원래 색 그라데이션이 남고, 밝은 아트면 그 색이 번진다 */
   transform: scale(1.15);
   opacity: 0;
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--look-fade) var(--ease-soft);
 }
 
 [data-mode="wallpaper"] .ambient-layer.on {
@@ -670,7 +670,7 @@ body {
   border-radius: 2vh;
   filter: blur(4.5vh) saturate(1.8) brightness(1.1);
   opacity: 0;
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--look-fade) var(--ease-soft);
 }
 
 [data-mode="wallpaper"] .glow-layer.on {

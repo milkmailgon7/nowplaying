@@ -1,6 +1,8 @@
 :root {
   --art-size: 58vh;   /* 앨범 아트 크기 (Lively 설정에서 바뀜) */
-  --fade: 0.45s;      /* 곡이 바뀔 때 크로스페이드 시간 (script.js의 FADE_MS와 맞춤) */
+  --fade: 0.8s;       /* 곡이 바뀔 때 앨범 아트·배경 색 크로스페이드 (script.js의 FADE_MS와 맞춤) */
+  --look-fade: 1.6s;  /* 흐린 배경·아트 뒤 빛이 바뀌는 시간 (script.js의 LOOK_FADE_MS와 맞춤) */
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1); /* 천천히 시작해 천천히 끝남 */
   /* 대기열·볼륨의 오른쪽 여백: 앨범 아트와 대기열 사이를 가사와 앨범 아트 사이(5.6vh)만큼 둔다
      (아트를 키워도 화면 끝에서 3.9vh보다 바깥으로는 안 나감) */
   --right-edge: max(3.9vh, 50vw - min(var(--art-size), 80vw) / 2 - 5.6vh - 42vh);
@@ -37,7 +39,7 @@ body {
 
 .bg-layer {
   opacity: 0;
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--fade) var(--ease-soft);
 }
 
 .bg-layer.on {
@@ -58,7 +60,7 @@ body {
     0 2.4vh 6vh rgba(0, 0, 0, 0.45),
     0 0.6vh 1.6vh rgba(0, 0, 0, 0.25);
   opacity: 0;
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--fade) var(--ease-soft);
 }
 
 #art.has {
@@ -74,7 +76,7 @@ body {
   /* 썸네일(약 300px)을 크게 늘리므로 부드러운 보간이 가장 덜 거칠어 보임 */
   image-rendering: auto;
   opacity: 0;
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--fade) var(--ease-soft);
 }
 
 .art-layer.on {
@@ -91,7 +93,7 @@ body {
   fill: #1ed760;
   opacity: 0.9;
   filter: drop-shadow(0 1.6vh 4vh rgba(0, 0, 0, 0.35));
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--fade) var(--ease-soft);
   pointer-events: none;
 }
 
@@ -116,10 +118,14 @@ body {
   min-width: 0;
 }
 
-/* 제목이 바뀔 때: 빨리 사라지고(0.15초) 천천히 나타남(0.3초) */
+/* 제목이 바뀔 때: 0.25초에 사라지고 0.5초에 걸쳐 나타남 (그림이 바뀌는 0.8초와 어울리게) */
+#info {
+  transition: opacity 0.5s var(--ease-soft);
+}
+
 #info.hide {
   opacity: 0;
-  transition-duration: 0.15s;
+  transition-duration: 0.25s;
 }
 
 #title,
@@ -836,7 +842,7 @@ body.calm .ctl.like {
   mix-blend-mode: screen; /* 어두운 아트면 원래 색 그라데이션이 남고, 밝은 아트면 그 색이 번진다 */
   transform: scale(1.15);
   opacity: 0;
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--look-fade) var(--ease-soft);
 }
 
 :where(html:not([data-mode])) .ambient-layer.on {
@@ -1007,7 +1013,7 @@ body.calm .ctl.like {
   border-radius: 2vh;
   filter: blur(4.5vh) saturate(1.8) brightness(1.1);
   opacity: 0;
-  transition: opacity var(--fade) ease;
+  transition: opacity var(--look-fade) var(--ease-soft);
 }
 
 :where(html:not([data-mode])) .glow-layer.on {
