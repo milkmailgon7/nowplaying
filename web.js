@@ -88,19 +88,106 @@
     store(AUTH_KEY, null);
   }
 
-  async function tokenRequest(form) {
-    let res;
-    try {
-      res = await fetch(`${ACCOUNTS}/api/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(form),
-      });
-    } catch (e) {
-      throw new Error('인터넷에 연결할 수 없어요');
+  // ---------- 작은 알림 ----------
+  // 오류 안내는 원래 목록 칸(#panel) 안에 뜨는데, 휴대폰과 세로 바탕화면에는 목록 칸이 없어서 안 보인다.
+  // 그럴 때는 앨범 아트 아래쪽에 작은 알림으로 대신 보여 준다. 인터넷이 끊겼을 때도 여기에 알린다.
+
+  const toast = document.createElement('div');
+  toast.id = 'web-toast';
+  let panelText = '';   // 목록 칸이 안 보일 때 대신 보여 줄 안내
+  let netDown = false;  // Spotify에 한동안 연결하지 못함
+
+  function drawToast() {
+    const text = netDown ? '인터넷 연결이 끊겼어요' : panelText;
+    const on = !!text && !document.querySelector('#web-login.on'); // 로그인 화면이 떠 있으면 그쪽이 알려 줌
+    if (on) {
+      if (!toast.isConnected) document.body.append(toast);
+      toast.textContent = text;
+      const art = document.getElementById('art').getBoundingClientRect();
+      toast.style.left = `${art.left + art.width / 2}px`;
+      toast.style.top = `${art.bottom}px`; // tablet.css가 제 높이만큼 위로 올려서 아트 아래쪽 안에 놓음
+      toast.style.maxWidth = `${art.width * 0.9}px`;
     }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    toast.classList.toggle('on', on);
+  }
+
+  {
+    const msg = document.getElementById('panel-msg');
+    const panel = document.getElementById('panel');
+    const sync = () => {
+      const shown = msg.classList.contains('on') && getComputedStyle(panel).display === 'none';
+      panelText = shown ? msg.textContent : '';
+      drawToast();
+    };
+    new MutationObserver(sync).observe(msg, { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
+    window.addEventListener('resize', sync); // 화면을 돌리면 목록 칸이 생기거나 없어짐
+  }
+
+  // ---------- 인터넷 요청 ----------
+  // 응답이 안 오는 요청은 10초에 끊는다 (2초마다 묻는데 안 끊으면 계속 쌓임).
+  // 6초 넘게 연달아 실패하면 인터넷이 끊겼다고 알리고, 한 번이라도 되면 지운다.
+  // (화면을 막 켰을 때 와이파이가 다시 붙는 1~2초 동안은 알리지 않으려고 6초를 기다림)
+
+  const TIMEOUT_MS = 10000;
+  let failingSince = 0;
+
+  // since: 실패한 요청을 보낸 때 (응답 없이 10초를 기다린 것이면 그때부터 센다)
+  let lastOk = 0;
+
+  function netResult(ok, since) {
+    if (ok) {
+      failingSince = 0;
+      lastOk = Date.now();
+    } else if (since < lastOk) {
+      return; // 그 뒤에 보낸 요청이 이미 성공했음 (오래 걸리다 끊긴 옛 요청)
+    } else if (!failingSince) {
+      failingSince = since;
+    }
+    const down = !ok && Date.now() - failingSince >= 6000;
+    if (down !== netDown) {
+      netDown = down;
+      drawToast();
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) netResult(true); // 화면을 다시 켰으면 처음부터 다시 셈
+  });
+
+  // 응답의 { status, text, retryAfter(초) }. 연결하지 못했으면 오류를 던진다
+  async function request(url, init) {
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), TIMEOUT_MS);
+    const sent = Date.now();
+    try {
+      const res = await fetch(url, { ...init, signal: stop.signal });
+      const text = await res.text();
+      netResult(true);
+      return { status: res.status, text, retryAfter: Number(res.headers.get('Retry-After')) || 0 };
+    } catch (e) {
+      netResult(false, sent);
+      throw new Error('인터넷에 연결할 수 없어요');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const parse = (text) => {
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch (e) {
+      return null; // 재생 조작은 성공해도 JSON이 아닌 응답이 올 때가 있음
+    }
+  };
+
+  async function tokenRequest(form) {
+    const res = await request(`${ACCOUNTS}/api/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(form),
+    });
+    const data = parse(res.text) || {};
+    if (res.status >= 300) {
       if (res.status === 400 || res.status === 401) {
         // 앱 화면과 바탕화면이 같은 토큰을 쓰다가 다른 쪽이 먼저 새 토큰으로 바꿨으면, 로그아웃하지 않고 그걸 쓴다
         const stored = load(AUTH_KEY);
@@ -180,28 +267,30 @@
 
   // ---------- Web API ----------
 
+  // Spotify가 "요청이 너무 많다"(429)고 하면 쉬라는 시간 동안은 아예 묻지 않는다.
+  // 계속 물으면 막히는 시간이 더 길어진다. 쉬라는 시간을 못 읽으면 5초, 10초, 20초… 최대 5분씩 늘려 쉰다
+  let blockedUntil = 0;
+  let blockCount = 0;
+
   async function api(method, path, params, body, retry = true) {
+    if (Date.now() < blockedUntil) return [429, null];
     const url = API + path + (params ? `?${new URLSearchParams(params)}` : '');
     const headers = { Authorization: `Bearer ${await token()}` };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    let res;
-    try {
-      res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
-    } catch (e) {
-      throw new Error('인터넷에 연결할 수 없어요');
-    }
+    const res = await request(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
     if (res.status === 401 && retry) {
       accessToken = null;
       return api(method, path, params, body, false);
     }
-    const text = await res.text();
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch (e) {
-      data = null; // 재생 조작은 성공해도 JSON이 아닌 응답이 올 때가 있음
+    if (res.status === 429) {
+      blockCount++;
+      const wait = res.retryAfter || Math.min(300, 5 * 2 ** (blockCount - 1));
+      blockedUntil = Date.now() + Math.min(wait, 3600) * 1000;
+      console.info('[NowPlaying] Spotify 429, waiting', wait, 's');
+    } else {
+      blockCount = 0;
     }
-    return [res.status, data];
+    return [res.status, parse(res.text)];
   }
 
   function errorMessage(code, payload) {
@@ -263,9 +352,16 @@
 
   let userId = null; // '좋아요 표시한 곡' 재생 주소에 씀
 
+  let playerAsked = 0;    // /me/player를 물은 차례
+  let playerAnswered = 0; // 화면에 반영한 마지막 차례
+
   async function apiPlayer() {
+    const turn = ++playerAsked;
     const [code, p] = await api('GET', '/me/player');
-    if (code === 204 || !p) {
+    // 느린 연결에서 먼저 물은 것의 답이 나중에 오면 버린다 (옛 곡·옛 위치로 되돌아가지 않게)
+    if (turn < playerAnswered) throw new Error('늦게 온 응답');
+    playerAnswered = turn;
+    if (code === 204 || (!p && code < 300)) {
       setPlaying(false);
       return { active: false };
     }

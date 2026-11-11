@@ -82,6 +82,41 @@ body {
   display: none;
 }
 
+/* ---------- 작은 알림 ---------- */
+/* 목록 칸이 없는 화면(휴대폰, 세로 바탕화면)의 오류 안내와 '인터넷 연결이 끊겼어요'.
+   web.js가 앨범 아트의 아래 끝 가운데에 놓고, 여기서 제 높이만큼 위로 올려 아트 안쪽 아래에 보이게 한다 */
+#web-toast {
+  display: none;
+  position: fixed;
+  z-index: 40;
+  width: max-content;
+  transform: translate(-50%, calc(-100% - 1.6vh));
+  padding: 0.9vh 1.8vh;
+  border-radius: 1.4vh;
+  background: rgba(24, 28, 28, 0.92);
+  box-shadow: 0 0.6vh 2vh rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1.5vh;
+  line-height: 1.45;
+  text-align: center;
+  white-space: pre-line;
+  word-break: keep-all;
+  pointer-events: none;
+}
+
+#web-toast.on {
+  display: block;
+}
+
+@media (orientation: portrait) {
+  #web-toast {
+    transform: translate(-50%, calc(-100% - 3vw));
+    padding: 1.6vw 3.2vw;
+    border-radius: 2.4vw;
+    font-size: 2.6vw;
+  }
+}
+
 /* ---------- 검색 입력칸 ---------- */
 /* 검색칸의 글자 자리에 겹쳐 띄운다 (검색칸은 입력 중 모양으로 바뀌고 안내 글자는 숨겨짐) */
 #web-search {
@@ -404,6 +439,12 @@ body {
 
   [data-mode="wallpaper"] #controls {
     top: calc(18.5vh + var(--phone-art) + 18vw);
+  }
+
+  [data-mode] #web-toast {
+    padding: 2vw 3.8vw;
+    border-radius: 3vw;
+    font-size: 3.5vw;
   }
 
   /* 로그인 화면 */
