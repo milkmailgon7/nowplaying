@@ -711,6 +711,12 @@ body {
     top: var(--mid);
   }
 
+  /* 시계는 위쪽 자물쇠 아이콘(화면 높이의 약 5.5~7.7%) 아래에서 시작하게 조금 작게 */
+  [data-mode="wallpaper"] #clock {
+    --clock-size: 6vh;
+    bottom: calc(100vh - var(--mid) + min(var(--art-size), 80vw) / 2 + 1.2vh);
+  }
+
   /* 곡 정보·재생바·버튼 줄의 폭을 앨범 아트 폭에 맞춘다 */
   [data-mode="wallpaper"] #info {
     width: min(var(--art-size), 80vw);
