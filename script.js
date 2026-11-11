@@ -14,6 +14,38 @@
   const bgState = { idx: 0, gen: 0 };
   const artState = { idx: 0, gen: 0 };
 
+  // 앨범 아트를 크게 흐려 배경에 깐 것(.ambient-layer)과 아트 뒤 아트 색 빛(.glow-layer). 모양은 style.css.
+  // 탭 버전의 앱 화면(로그인·검색용, data-mode="app")에는 넣지 않는다
+  const lookLayers = [];
+  const lookState = { idx: 0, gen: 0 };
+  if (document.documentElement.dataset.mode !== 'app') {
+    const make = (cls) => [0, 1].map(() => Object.assign(document.createElement('div'), { className: cls }));
+    const ambient = make('ambient-layer');
+    const glow = make('glow-layer');
+    const shade = Object.assign(document.createElement('div'), { id: 'ambient-shade' });
+    const grain = Object.assign(document.createElement('div'), { id: 'ambient-grain' });
+    document.getElementById('bg').after(...ambient, shade, grain, ...glow);
+    lookLayers.push(ambient, glow);
+  }
+
+  // 흐린 배경과 빛을 새 그림으로 (두 장을 번갈아 겹쳐 부드럽게). null이면 둘 다 사라짐
+  function setLookArt(src) {
+    if (!lookLayers.length) return;
+    const gen = ++lookState.gen;
+    lookState.idx ^= 1;
+    for (const pair of lookLayers) {
+      const next = pair[lookState.idx];
+      const prev = pair[lookState.idx ^ 1];
+      if (src) next.style.backgroundImage = `url("${src.replace(/"/g, '%22')}")`;
+      next.classList.toggle('on', !!src);
+      prev.classList.remove('on');
+    }
+    setTimeout(() => {
+      if (lookState.gen !== gen) return;
+      for (const pair of lookLayers) pair[lookState.idx ^ 1].style.backgroundImage = ''; // 안 보이는 쪽 그림은 놓아 줌
+    }, FADE_MS + 50);
+  }
+
   let hostSeen = false;  // Lively / Wallpaper Engine에서 신호가 온 적 있는지
   let shownKey = null;   // 화면에 보이는 곡 (제목으로 구분)
   let nowTrack = null;   // 화면에 보이는 곡 정보
@@ -155,6 +187,7 @@
       crossfade(artLayers, artState, (el) => {
         el.src = src;
       });
+      setLookArt(src);
       artBox.classList.add('has');
     }, () => {});
   }
@@ -269,6 +302,7 @@
       crossfade(artLayers, artState, (el) => {
         el.src = baseArt.src;
       });
+      setLookArt(baseArt.src);
     }
   }
 
@@ -708,6 +742,7 @@
     titleEl.textContent = '';
     subEl.textContent = '';
     artBox.classList.remove('has');
+    setLookArt(null);
     setProgress(0, 0, false);
     setLikeTrack(null);
     setLyricsTrack(null);
