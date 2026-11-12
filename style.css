@@ -965,15 +965,20 @@ body.calm .ctl.like {
     width: 58vh;
   }
 
-  /* 가사: 지금 줄을 크게·또렷하게, 나머지는 더 흐리게 */
+  /* 가사: 지금 줄을 크게·또렷하게, 나머지는 더 흐리게.
+     모든 줄을 큰 글씨로 한 번만 배치하고, 지금 줄이 아닌 줄은 화면에서만 줄여(scale) 보인다.
+     (글씨 크기를 바꾸면 커지는 동안 줄바꿈이 바뀌고 아래 줄이 밀리며, 스크롤 목표도 어긋나 툭툭 끼워 맞춰졌음) */
   :where(html:not([data-mode])) #lyrics .line {
-    font-size: 2.2vh;
+    font-size: 2.9vh;
+    margin-bottom: 0.4vh; /* 줄인 줄은 위아래가 조금씩 비어 보여서 간격을 줄여 둠 */
     color: rgba(255, 255, 255, 0.36);
-    transition: color 0.3s ease, font-size 0.3s ease;
+    transform: scale(0.8);
+    transform-origin: left center;
+    transition: color 0.4s ease, transform 0.6s cubic-bezier(0.25, 0.8, 0.3, 1); /* 스크롤(.inner)과 같은 움직임 */
   }
 
   :where(html:not([data-mode])) #lyrics .line.on {
-    font-size: 2.9vh;
+    transform: none;
     color: #fff;
     text-shadow: 0 0 2.4vh rgba(255, 255, 255, 0.25);
   }
