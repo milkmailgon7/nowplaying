@@ -875,6 +875,7 @@
   function row({ image, title, sub, now, onClick, action }) {
     const el = document.createElement('div');
     el.className = `row${now ? ' now' : ''}${onClick ? ' click' : ''}`;
+    el.dataset.key = `${title || ''}${sub || ''}${image || ''}`;
     const img = document.createElement('img');
     img.alt = '';
     img.loading = 'lazy';
@@ -913,18 +914,34 @@
     return el;
   }
 
+  // 목록을 다시 그릴 때, 원래 있던 곡 줄은 나타나는 효과 없이 그대로 보이게 하고 이미 그려진 썸네일을 옮겨 쓴다.
+  // (전부 새로 만들면 곡이 바뀔 때마다 모든 줄이 투명한 데서 다시 나타나고 썸네일도 한 순간 비어서 대기열이 깜빡였음)
+  function keepRows(list, items) {
+    const old = new Map();
+    for (const el of list.querySelectorAll('.row')) old.set(el.dataset.key, el);
+    for (const el of items) {
+      const prev = el.classList && el.classList.contains('row') && old.get(el.dataset.key);
+      if (!prev) continue;
+      old.delete(el.dataset.key);
+      el.classList.add('stay');
+      const oldImg = prev.querySelector('img');
+      const newImg = el.querySelector('img');
+      if (oldImg && newImg && oldImg.src === newImg.src && oldImg.complete) newImg.replaceWith(oldImg);
+    }
+    list.replaceChildren(...items);
+  }
+
   function renderQueue(q) {
     queueData = q;
-    listQueue.replaceChildren();
     if (!q || !q.current) {
-      listQueue.append(label('empty', '재생 중인 곡이 없어요'));
+      listQueue.replaceChildren(label('empty', '재생 중인 곡이 없어요'));
       return;
     }
     const c = q.current;
-    listQueue.append(label('section', '지금 재생 중'), row({ image: c.image, title: c.name, sub: c.artists, now: true }));
-    if (q.queue.length) listQueue.append(label('section', '다음 곡'));
+    const items = [label('section', '지금 재생 중'), row({ image: c.image, title: c.name, sub: c.artists, now: true })];
+    if (q.queue.length) items.push(label('section', '다음 곡'));
     q.queue.forEach((t, i) => {
-      listQueue.append(row({
+      items.push(row({
         image: t.image,
         title: t.name,
         sub: t.artists,
@@ -935,6 +952,7 @@
         },
       }));
     });
+    keepRows(listQueue, items);
     updateThumb();
     prefetch(q.queue.slice(0, 2));
     fetchLiked(q.queue.slice(0, 2).map((t) => t.uri)); // 다음 곡으로 넘기면 하트가 바로 보이게

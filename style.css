@@ -688,6 +688,11 @@ body.calm .ctl.like {
   animation: row-in 0.25s ease;
 }
 
+/* 다시 그릴 때 원래 있던 줄은 효과 없이 (script.js keepRows) */
+.row.stay {
+  animation: none;
+}
+
 @keyframes row-in {
   from {
     opacity: 0;
