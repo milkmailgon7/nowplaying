@@ -720,11 +720,32 @@
       queued = true;
       requestAnimationFrame(update);
     };
+    // 브라우저의 부드러운 스크롤(behavior: 'smooth')은 0.5초 넘게 걸려서 답답했다. 0.22초 동안 직접 움직인다.
+    // 움직이는 중에 또 누르면 가던 자리에서 한 쪽 더 간다
+    const GLIDE_MS = 220;
+    let glide = null; // { list, to, raf }
+    const glideBy = (l, dir) => {
+      const max = l.scrollHeight - l.clientHeight;
+      const from = l.scrollTop;
+      const base = glide && glide.list === l ? glide.to : from;
+      const to = Math.max(0, Math.min(max, base + dir * step(l)));
+      if (glide) cancelAnimationFrame(glide.raf);
+      const t0 = performance.now();
+      const g = { list: l, to, raf: 0 };
+      const tick = (now) => {
+        const k = Math.min(1, (now - t0) / GLIDE_MS);
+        l.scrollTop = from + (to - from) * (1 - Math.pow(1 - k, 3)); // 빠르게 출발해서 부드럽게 멈춤
+        if (k < 1) g.raf = requestAnimationFrame(tick);
+        else if (glide === g) glide = null;
+      };
+      glide = g;
+      g.raf = requestAnimationFrame(tick);
+    };
     pager.addEventListener('click', (e) => {
       const b = e.target.closest('.pg');
       const l = activeList();
       if (!b || b.disabled || !l) return;
-      l.scrollBy({ top: Number(b.dataset.dir) * step(l), behavior: 'smooth' });
+      glideBy(l, Number(b.dataset.dir));
     });
     panel.addEventListener('scroll', later, true); // 목록이 움직이면 쪽수·버튼을 다시
     new MutationObserver(later).observe(panel.querySelector('.lists'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
