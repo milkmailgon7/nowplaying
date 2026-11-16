@@ -680,6 +680,73 @@
 
   document.addEventListener('visibilitychange', syncWakeLock); // 화면을 다시 켜면 다시 잡음
 
+  // ---------- 잠금화면 / 홈 화면 ----------
+  // 같은 바탕화면이 잠금화면과 홈 화면에 다 깔릴 수 있다. 앱(NowPlayingWallpaper)이 지금 어느 쪽인지 알려 주면
+  // <html data-screen="lock|home">으로 표시해서 모양을 따로 맞춘다 (tablet.css의 [data-screen="home"]).
+  // 홈 화면은 손가락으로 끄는 동작을 홈 화면(페이지 넘기기)이 가져가서, 목록은 끌어 내리는 대신 위·아래 버튼으로 넘긴다.
+  // 시험할 때는 주소에 &screen=home 을 붙이면 홈 화면 모양이 된다
+  if (MODE === 'wallpaper') {
+    const panel = document.getElementById('panel');
+    const pager = document.createElement('div');
+    pager.id = 'pager';
+    const chevron = (d) => `<svg viewBox="0 0 16 16"><path d="${d}"/></svg>`;
+    pager.innerHTML =
+      `<button class="pg" data-dir="-1" aria-label="위로">${chevron('M8 4.6 2.9 9.7l1.06 1.06L8 6.72l4.04 4.04 1.06-1.06z')}</button>` +
+      '<span class="pg-count"></span>' +
+      `<button class="pg" data-dir="1" aria-label="아래로">${chevron('M8 11.4 2.9 6.3l1.06-1.06L8 9.28l4.04-4.04 1.06 1.06z')}</button>`;
+    panel.append(pager);
+    const [upBtn, downBtn] = pager.querySelectorAll('.pg');
+    const count = pager.querySelector('.pg-count');
+    const activeList = () => panel.querySelector('.list.on');
+    const step = (l) => Math.max(1, Math.round(l.clientHeight * 0.85)); // 한 번에 넘기는 양 (윗부분 몇 줄은 겹쳐 보이게)
+
+    let queued = false;
+    const update = () => {
+      queued = false;
+      if (document.documentElement.dataset.screen !== 'home') return;
+      const l = activeList();
+      if (!l) return;
+      const max = l.scrollHeight - l.clientHeight;
+      const s = step(l);
+      const pages = max > 1 ? Math.ceil(max / s) + 1 : 1;
+      const page = l.scrollTop >= max - 1 ? pages : Math.min(pages, Math.floor(l.scrollTop / s + 0.5) + 1);
+      upBtn.disabled = l.scrollTop <= 1;
+      downBtn.disabled = l.scrollTop >= max - 1;
+      count.textContent = pages > 1 ? `${page} / ${pages}` : '';
+      pager.classList.toggle('single', pages <= 1);
+    };
+    const later = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(update);
+    };
+    pager.addEventListener('click', (e) => {
+      const b = e.target.closest('.pg');
+      const l = activeList();
+      if (!b || b.disabled || !l) return;
+      l.scrollBy({ top: Number(b.dataset.dir) * step(l), behavior: 'smooth' });
+    });
+    panel.addEventListener('scroll', later, true); // 목록이 움직이면 쪽수·버튼을 다시
+    new MutationObserver(later).observe(panel.querySelector('.lists'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('resize', later);
+
+    const forced = params.get('screen');
+    const app = window.NowPlayingApp;
+    window.npScreen = (s) => {
+      const screen = forced || (s === 'home' ? 'home' : 'lock');
+      if (document.documentElement.dataset.screen === screen) return;
+      document.documentElement.dataset.screen = screen;
+      later();
+    };
+    let first = '';
+    try {
+      first = app && app.screen ? app.screen() : '';
+    } catch (e) {
+      first = '';
+    }
+    window.npScreen(first);
+  }
+
   // ---------- 잠금화면 터치 ----------
   // 잠금화면은 바탕화면에 터치를 넘겨 주지 않는다. 그래서 앱의 접근성 기능(android 폴더의 LockTouchService)이
   // 버튼이 있는 자리만 투명하게 덮어 터치를 받고 이 페이지에 넘긴다. 그 자리를 화면 픽셀로 알려 준다

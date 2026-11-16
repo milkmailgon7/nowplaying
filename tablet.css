@@ -856,3 +856,67 @@ body {
     height: 0.9vw;
   }
 }
+
+/* ---------- 홈 화면 (바탕화면이 홈 화면에 보일 때, web.js가 <html data-screen="home">) ---------- */
+/* 홈 화면은 끄는 동작을 홈 화면(페이지 넘기기)이 가져가서 목록을 끌어 내릴 수 없다.
+   그래서 스크롤바 대신 목록 아래에 위·아래 버튼을 두고 눌러서 넘긴다 */
+#pager {
+  display: none;
+}
+
+[data-screen="home"] #pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1vh;
+  margin-top: 1.2vh;
+  padding-right: 0.8vh;
+}
+
+[data-screen="home"] #pager.single {
+  visibility: hidden; /* 한 쪽뿐이면 자리만 두고 숨김 (목록 높이가 들쭉날쭉하지 않게) */
+}
+
+[data-screen="home"] .pg {
+  flex: 1;
+  height: 4.8vh;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: background 0.15s ease, opacity 0.2s ease;
+}
+
+[data-screen="home"] .pg:active {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+[data-screen="home"] .pg:disabled {
+  opacity: 0.3;
+}
+
+[data-screen="home"] .pg svg {
+  width: 2.6vh;
+  height: 2.6vh;
+  fill: currentColor;
+}
+
+[data-screen="home"] .pg-count {
+  min-width: 7vh;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.35vh;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-screen="home"] .scroll-track {
+  display: none;
+}
+
+[data-screen="home"] .list {
+  overflow-y: hidden; /* 손가락으로는 안 움직이게 (버튼으로만) */
+  padding-right: 0.8vh;
+}
